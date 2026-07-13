@@ -1,0 +1,56 @@
+# NIHA POS — Supabase Cloud project
+# Local Supabase (Docker) is not used for development.
+# Link CLI: supabase link --project-ref <your-project-ref>
+# Docs: https://supabase.com/docs/guides/cli/getting-started
+
+project_id = "nzwgoavyrshuypkugvzc"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+
+[inbucket]
+enabled = true
+port = 54324
+
+[storage]
+enabled = true
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+jwt_expiry = 3600
+# Public self-signup is disabled — staff are created by a manager (ADR-0018) via the
+# staff-create Edge Function using the service role.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+enable_confirmations = false
+
+# Privileged server-side operations (ADR-0019).
+# verify_jwt is FALSE on purpose: platform-level JWT checks also reject the browser's
+# CORS preflight (OPTIONS carries no Authorization header) → preflight fails. Instead the
+# function verifies the caller's JWT + owner/manager role in-code via requireManager()
+# BEFORE using the service role, so security is unchanged and preflight can pass.
+[functions.staff-create]
+verify_jwt = false
+
+[functions.staff-reset-password]
+verify_jwt = false
+
+[functions.pos-pin-login]
+verify_jwt = false

@@ -1,0 +1,16 @@
+export const common = {
+  appName: 'NIHA POS',
+  loading: 'جارٍ التحميل…',
+  save: 'حفظ',
+  cancel: 'إلغاء',
+  create: 'إنشاء',
+  back: 'رجوع',
+  search: 'بحث…',
+  retry: 'إعادة المحاولة',
+  previous: 'السابق',
+  next: 'التالي',
+  pageOf: (page: number, total: number) => `صفحة ${page} من ${total}`,
+  confirm: 'تأكيد',
+  close: 'إغلاق',
+  edit: 'تعديل',
+} as const

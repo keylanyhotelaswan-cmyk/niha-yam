@@ -1,0 +1,2 @@
+-- NIHA POS baseline migration (M0)
+-- Domain tables are introduced in later modules.

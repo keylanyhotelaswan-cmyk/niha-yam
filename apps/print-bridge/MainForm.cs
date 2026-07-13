@@ -1,0 +1,474 @@
+using System.Drawing.Printing;
+
+namespace Niha.PrintBridge;
+
+public sealed class MainForm : Form
+{
+    private readonly BridgeConfig _cfg;
+    private readonly BridgeLogger _log;
+    private readonly PrintWorker _worker;
+    private readonly NotifyIcon _tray;
+
+    private readonly Label _linkStatus;
+    private readonly Label _pairStatus;
+    private readonly Label _device;
+    private readonly Label _restaurant;
+    private readonly Label _lastPrint;
+    private readonly ListBox _printers;
+    private readonly Panel _advancedPanel;
+    private Label _advVersion = null!;
+    private Label _advBridgeId = null!;
+    private Label _advHeartbeat = null!;
+    private readonly Button _advancedToggle;
+    private bool _advancedOpen;
+
+    public MainForm(BridgeConfig cfg, BridgeLogger log, PrintWorker worker, NotifyIcon tray)
+    {
+        _cfg = cfg;
+        _log = log;
+        _worker = worker;
+        _tray = tray;
+
+        NihaTheme.ApplyForm(this);
+        Text = Ar.AppTitle;
+        Width = 520;
+        Height = 640;
+        MinimumSize = new Size(480, 560);
+
+        try { Icon = NihaTheme.CreateAppIcon(); } catch { /* ignore */ }
+
+        var root = new Panel { Dock = DockStyle.Fill, Padding = new Padding(16), AutoScroll = true };
+
+        var header = BuildHeader();
+        header.Dock = DockStyle.Top;
+        header.Height = 64;
+
+        var statusCard = NihaTheme.Card();
+        statusCard.Dock = DockStyle.Top;
+        statusCard.Height = 150;
+        statusCard.Padding = new Padding(16);
+        PaintBorder(statusCard);
+
+        _linkStatus = Row(statusCard, Ar.Status, Ar.Connecting, 8);
+        _pairStatus = Row(statusCard, Ar.Paired, Ar.NotPaired, 40);
+        _device = Row(statusCard, Ar.DeviceName, Environment.MachineName, 72);
+        _restaurant = Row(statusCard, Ar.Restaurant, cfg.RestaurantName ?? Ar.None, 104);
+
+        var printersCard = NihaTheme.Card();
+        printersCard.Dock = DockStyle.Top;
+        printersCard.Height = 210;
+        printersCard.Padding = new Padding(16);
+        PaintBorder(printersCard);
+        var printersTitle = new Label
+        {
+            Text = Ar.PrintersDiscovered,
+            Font = NihaTheme.UiFont(11f, FontStyle.Bold),
+            Dock = DockStyle.Top,
+            Height = 28,
+        };
+        var showVirtual = new CheckBox
+        {
+            Text = Ar.ShowVirtualPrinters,
+            Checked = _cfg.ShowVirtualPrinters,
+            Dock = DockStyle.Bottom,
+            Height = 28,
+            Font = NihaTheme.UiFont(8.5f),
+            ForeColor = NihaTheme.Muted,
+            AutoSize = false,
+        };
+        showVirtual.CheckedChanged += (_, _) =>
+        {
+            _cfg.ShowVirtualPrinters = showVirtual.Checked;
+            ConfigStore.Save(_cfg);
+            LoadPrinters();
+        };
+        _printers = new ListBox
+        {
+            Dock = DockStyle.Fill,
+            Font = NihaTheme.UiFont(10f),
+            BorderStyle = BorderStyle.FixedSingle,
+            IntegralHeight = false,
+        };
+        printersCard.Controls.Add(_printers);
+        printersCard.Controls.Add(showVirtual);
+        printersCard.Controls.Add(printersTitle);
+
+        var lastCard = NihaTheme.Card();
+        lastCard.Dock = DockStyle.Top;
+        lastCard.Height = 72;
+        lastCard.Padding = new Padding(16);
+        PaintBorder(lastCard);
+        var lastTitle = new Label
+        {
+            Text = Ar.LastPrint,
+            Font = NihaTheme.UiFont(10f, FontStyle.Bold),
+            Dock = DockStyle.Top,
+            Height = 22,
+        };
+        _lastPrint = new Label
+        {
+            Text = FormatLastPrint(),
+            Dock = DockStyle.Fill,
+            ForeColor = NihaTheme.Muted,
+            Font = NihaTheme.UiFont(9.5f),
+        };
+        lastCard.Controls.Add(_lastPrint);
+        lastCard.Controls.Add(lastTitle);
+
+        var actions = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 52,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = true,
+            Padding = new Padding(0, 8, 0, 0),
+        };
+
+        var openPc = NihaTheme.PrimaryButton(Ar.OpenPrintCenter);
+        openPc.Width = 160;
+        openPc.Click += (_, _) => OpenPrintCenter();
+        openPc.Visible = !string.IsNullOrWhiteSpace(_cfg.PrintCenterUrl);
+
+        var rePair = NihaTheme.OutlineButton(Ar.RePair);
+        rePair.Width = 130;
+        rePair.Click += (_, _) => RequestRePair();
+
+        actions.Controls.Add(openPc);
+        actions.Controls.Add(rePair);
+
+        var adminHint = new Label
+        {
+            Text = Ar.AdminHint,
+            Dock = DockStyle.Top,
+            Height = 40,
+            ForeColor = NihaTheme.Muted,
+            Font = NihaTheme.UiFont(8.5f),
+        };
+
+        _advancedToggle = NihaTheme.OutlineButton(Ar.Advanced);
+        _advancedToggle.Dock = DockStyle.Top;
+        _advancedToggle.Height = 36;
+        _advancedToggle.Click += (_, _) => ToggleAdvanced();
+
+        _advancedPanel = BuildAdvanced();
+        _advancedPanel.Dock = DockStyle.Top;
+        _advancedPanel.Visible = false;
+        _advancedPanel.Height = 200;
+
+        // Dock order: last added is topmost among Top docks when added carefully —
+        // use a vertical TableLayout instead for clarity.
+        var stack = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 7,
+            AutoSize = true,
+        };
+        stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
+        stack.Controls.Add(statusCard, 0, 0);
+        stack.Controls.Add(adminHint, 0, 1);
+        stack.Controls.Add(printersCard, 0, 2);
+        stack.Controls.Add(lastCard, 0, 3);
+        stack.Controls.Add(actions, 0, 4);
+        stack.Controls.Add(_advancedToggle, 0, 5);
+        stack.Controls.Add(_advancedPanel, 0, 6);
+
+        root.Controls.Add(stack);
+        Controls.Add(root);
+        Controls.Add(header);
+
+        LoadPrinters();
+        RefreshStatus(BridgeLinkState.Connecting);
+        _worker.StateChanged += OnWorkerState;
+        _worker.PrintFinished += OnPrintFinished;
+
+        FormClosing += (_, e) =>
+        {
+            if (e.CloseReason == CloseReason.UserClosing)
+            {
+                e.Cancel = true;
+                Hide();
+            }
+        };
+    }
+
+    public event Action? RePairRequested;
+
+    private Panel BuildHeader()
+    {
+        var p = new Panel { BackColor = NihaTheme.Primary };
+        var logo = new PictureBox
+        {
+            Image = NihaTheme.CreateLogo(40),
+            SizeMode = PictureBoxSizeMode.Zoom,
+            Size = new Size(40, 40),
+            Dock = DockStyle.Right,
+            Margin = new Padding(12),
+        };
+        var titles = new Panel { Dock = DockStyle.Fill, Padding = new Padding(12, 10, 12, 10) };
+        var ver = typeof(MainForm).Assembly.GetName().Version?.ToString(3) ?? "0.3.13";
+        var t1 = new Label
+        {
+            Text = Ar.AppTitle,
+            ForeColor = NihaTheme.OnPrimary,
+            Font = NihaTheme.UiFont(12f, FontStyle.Bold),
+            Dock = DockStyle.Top,
+            Height = 24,
+            TextAlign = ContentAlignment.MiddleRight,
+        };
+        var t2 = new Label
+        {
+            Text = $"{Ar.AppSubtitle} · v{ver}",
+            ForeColor = Color.FromArgb(230, 255, 255, 255),
+            Font = NihaTheme.UiFont(9f),
+            Dock = DockStyle.Top,
+            Height = 20,
+            TextAlign = ContentAlignment.MiddleRight,
+        };
+        Text = $"{Ar.AppTitle} · v{ver}";
+        titles.Controls.Add(t2);
+        titles.Controls.Add(t1);
+        p.Controls.Add(titles);
+        p.Controls.Add(logo);
+        return p;
+    }
+
+    private Panel BuildAdvanced()
+    {
+        var p = NihaTheme.Card();
+        PaintBorder(p);
+        p.Padding = new Padding(16);
+        var note = new Label
+        {
+            Text = Ar.TechNote,
+            Dock = DockStyle.Top,
+            Height = 28,
+            ForeColor = NihaTheme.Muted,
+            Font = NihaTheme.UiFont(8.5f),
+        };
+        _advVersion = Row(p, Ar.Version, typeof(MainForm).Assembly.GetName().Version?.ToString() ?? "0.2.0", 36);
+        _advBridgeId = Row(p, Ar.BridgeId, ShortId(_cfg.BridgeId), 68);
+        _advHeartbeat = Row(p, Ar.Heartbeat, Ar.None, 100);
+
+        var openLogs = NihaTheme.OutlineButton(Ar.OpenLogs);
+        openLogs.Dock = DockStyle.Bottom;
+        openLogs.Height = 32;
+        openLogs.Click += (_, _) =>
+        {
+            Directory.CreateDirectory(ConfigStore.Dir);
+            System.Diagnostics.Process.Start("explorer.exe", ConfigStore.Dir);
+        };
+
+        var localTest = NihaTheme.OutlineButton(Ar.TestPrint);
+        localTest.Dock = DockStyle.Bottom;
+        localTest.Height = 32;
+        localTest.Click += (_, _) =>
+        {
+            if (_printers.SelectedItem is PrinterListItem item &&
+                !string.IsNullOrWhiteSpace(item.Name))
+            {
+                try
+                {
+                    LocalTestPrint.Run(item.Name);
+                    MessageBox.Show(Ar.PrintOk, Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"{Ar.PrintFail}\n{ex.Message}", Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+            }
+            else
+            {
+                MessageBox.Show(Ar.SelectPrinter, Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+            }
+        };
+
+        p.Controls.Add(localTest);
+        p.Controls.Add(openLogs);
+        p.Controls.Add(note);
+        p.Height = 200;
+        return p;
+    }
+
+    private static Label Row(Control parent, string label, string value, int top)
+    {
+        var l = new Label
+        {
+            Text = label,
+            Left = 16,
+            Top = top,
+            Width = 120,
+            ForeColor = NihaTheme.Muted,
+            Font = NihaTheme.UiFont(9f),
+        };
+        var v = new Label
+        {
+            Text = value,
+            Left = 140,
+            Top = top,
+            Width = 300,
+            Font = NihaTheme.UiFont(10f, FontStyle.Bold),
+            AutoEllipsis = true,
+        };
+        parent.Controls.Add(l);
+        parent.Controls.Add(v);
+        return v;
+    }
+
+    private static void PaintBorder(Panel panel)
+    {
+        panel.Paint += (_, e) =>
+        {
+            using var pen = new Pen(NihaTheme.Border);
+            e.Graphics.DrawRectangle(pen, 0, 0, panel.Width - 1, panel.Height - 1);
+        };
+    }
+
+    private void LoadPrinters()
+    {
+        _printers.Items.Clear();
+        try
+        {
+            var installed = PrinterSettings.InstalledPrinters.Cast<string>();
+            foreach (var name in PrinterFilter.Filter(installed, _cfg.ShowVirtualPrinters))
+            {
+                var label = PrinterFilter.IsVirtual(name)
+                    ? $"{name}  ({Ar.VirtualTag})"
+                    : name;
+                _printers.Items.Add(new PrinterListItem(name, label));
+            }
+        }
+        catch
+        {
+            /* ignore */
+        }
+
+        if (_printers.Items.Count == 0)
+            _printers.Items.Add(new PrinterListItem("", Ar.NoPrinters));
+        else
+            _printers.SelectedIndex = 0;
+    }
+
+    private sealed record PrinterListItem(string Name, string Label)
+    {
+        public override string ToString() => Label;
+    }
+
+    private void ToggleAdvanced()
+    {
+        _advancedOpen = !_advancedOpen;
+        _advancedPanel.Visible = _advancedOpen;
+        _advancedToggle.Text = _advancedOpen ? Ar.HideAdvanced : Ar.Advanced;
+        _advBridgeId.Text = ShortId(_cfg.BridgeId);
+        _advHeartbeat.Text = _cfg.LastHeartbeatAt is { } hb
+            ? hb.ToLocalTime().ToString("g")
+            : Ar.None;
+    }
+
+    private void OnWorkerState(BridgeLinkState state)
+    {
+        if (IsDisposed) return;
+        BeginInvoke(() => RefreshStatus(state));
+    }
+
+    private void OnPrintFinished(bool ok, string summary)
+    {
+        if (IsDisposed) return;
+        BeginInvoke(() =>
+        {
+            _cfg.LastPrintOk = ok;
+            _cfg.LastPrintSummary = summary;
+            _cfg.LastPrintAt = DateTimeOffset.Now;
+            ConfigStore.Save(_cfg);
+            _lastPrint.Text = FormatLastPrint();
+            _lastPrint.ForeColor = ok ? NihaTheme.Success : NihaTheme.Danger;
+        });
+    }
+
+    public void RefreshStatus(BridgeLinkState state)
+    {
+        var paired = !string.IsNullOrWhiteSpace(_cfg.BridgeToken);
+        _pairStatus.Text = paired ? Ar.Paired : Ar.NotPaired;
+        _pairStatus.ForeColor = paired ? NihaTheme.Success : NihaTheme.Warning;
+        _restaurant.Text = string.IsNullOrWhiteSpace(_cfg.RestaurantName)
+            ? Ar.None
+            : _cfg.RestaurantName!;
+        _device.Text = Environment.MachineName;
+
+        _linkStatus.Text = state switch
+        {
+            BridgeLinkState.NotPaired => Ar.NotPaired,
+            BridgeLinkState.Connecting => Ar.Connecting,
+            BridgeLinkState.Connected => Ar.Connected,
+            BridgeLinkState.Disconnected => Ar.Disconnected,
+            _ => Ar.Disconnected,
+        };
+        _linkStatus.ForeColor = state switch
+        {
+            BridgeLinkState.Connected => NihaTheme.Success,
+            BridgeLinkState.Connecting => NihaTheme.Warning,
+            BridgeLinkState.NotPaired => NihaTheme.Muted,
+            _ => NihaTheme.Danger,
+        };
+
+        _tray.Text = paired ? Ar.TrayPaired : Ar.TrayNotPaired;
+        if (_advancedOpen)
+        {
+            _advBridgeId.Text = ShortId(_cfg.BridgeId);
+            _advHeartbeat.Text = _cfg.LastHeartbeatAt is { } hb
+                ? hb.ToLocalTime().ToString("g")
+                : Ar.None;
+        }
+    }
+
+    private string FormatLastPrint()
+    {
+        if (_cfg.LastPrintAt is null) return Ar.None;
+        var mark = _cfg.LastPrintOk == true ? Ar.PrintOk : Ar.PrintFail;
+        return $"{mark} · {_cfg.LastPrintSummary} · {_cfg.LastPrintAt.Value.ToLocalTime():g}";
+    }
+
+    private void RequestRePair()
+    {
+        var r = MessageBox.Show(
+            Ar.RePair + "؟",
+            Ar.AppTitle,
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+        if (r == DialogResult.Yes)
+            RePairRequested?.Invoke();
+    }
+
+    private void OpenPrintCenter()
+    {
+        if (string.IsNullOrWhiteSpace(_cfg.PrintCenterUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = _cfg.PrintCenterUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(ex.Message, Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private static string ShortId(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id)) return Ar.None;
+        return id.Length <= 12 ? id : id[..8] + "…";
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _worker.StateChanged -= OnWorkerState;
+            _worker.PrintFinished -= OnPrintFinished;
+        }
+        base.Dispose(disposing);
+    }
+}

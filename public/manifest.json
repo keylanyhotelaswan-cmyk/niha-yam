@@ -1,0 +1,10 @@
+{
+  "name": "NIHA POS",
+  "short_name": "NIHA POS",
+  "description": "Modern cloud restaurant POS",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#171717",
+  "lang": "en"
+}

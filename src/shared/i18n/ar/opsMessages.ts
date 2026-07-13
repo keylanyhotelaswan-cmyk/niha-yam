@@ -1,0 +1,20 @@
+export const opsMessages = {
+  title: 'رسائل تشغيلية',
+  body: 'نص الرسالة',
+  bodyPlaceholder: 'اكتب رسالة للكاشير أو المطبخ…',
+  targetRole: 'المستهدف',
+  roles: {
+    cashier: 'كاشير',
+    kitchen: 'مطبخ',
+    remote_operator: 'مشغّل عن بُعد',
+    all: 'الجميع',
+  },
+  print: 'طباعة عبر الجسر',
+  send: 'إرسال',
+  sent: 'تم إرسال الرسالة',
+  list: 'الرسائل الأخيرة',
+  empty: 'لا توجد رسائل بعد.',
+  acknowledge: 'تأكيد الاستلام',
+  acknowledged: 'تم التأكيد',
+  by: 'بواسطة',
+} as const

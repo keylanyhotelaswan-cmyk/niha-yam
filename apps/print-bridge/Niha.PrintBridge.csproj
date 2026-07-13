@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>Niha.PrintBridge</RootNamespace>
+    <AssemblyName>Niha.PrintBridge</AssemblyName>
+    <Version>0.3.13</Version>
+    <ApplicationIcon />
+    <Description>NIHA Print Bridge — standalone Windows tray executor (ADR-0030)</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="ArabicRt" Version="0.1.1" />
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.11" />
+    <PackageReference Include="System.Text.Encoding.CodePages" Version="8.0.0" />
+    <PackageReference Include="ZXing.Net" Version="0.16.11" />
+    <PackageReference Include="ZXing.Net.Bindings.Windows.Compatibility" Version="0.16.14" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,24 @@
+# Keep Vercel uploads lean (CLI may not honor .gitignore with empty git history)
+node_modules
+dist
+dist-ssr
+.vercel
+.env
+.env.local
+.env.*.local
+*.local
+coverage
+test-results
+playwright-report
+supabase/.branches
+supabase/.temp
+apps/print-bridge/publish
+apps/print-bridge/bin
+apps/print-bridge/obj
+*.tsbuildinfo
+.DS_Store
+Thumbs.db
+logs
+*.log
+
+# Allow only the staged Print Center download zip (do not ignore public/downloads)
