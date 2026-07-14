@@ -66,6 +66,7 @@ export function PaymentMethodTotalsStrip({
   rows,
   compact = true,
 }: TotalsProps) {
+  const safeRows = rows ?? []
   const toneFor = (code: string) => {
     if (code === 'cash') return 'bg-[#dcfce7] text-[#15803d]'
     if (code === 'instapay') return 'bg-[#eff6ff] text-[#2563eb]'
@@ -76,7 +77,7 @@ export function PaymentMethodTotalsStrip({
   }
 
   const byCode = new Map<string, { label: string; amount: number }>()
-  for (const r of rows) {
+  for (const r of safeRows) {
     const prev = byCode.get(r.code)
     byCode.set(r.code, {
       label: methodLabel(r.code, r.name),

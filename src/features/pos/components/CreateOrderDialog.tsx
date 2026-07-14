@@ -184,13 +184,13 @@ export function CreateOrderDialog({
           onOpenChange(next)
         }}
       >
-        <DialogContent className="max-h-[92dvh] max-w-lg overflow-y-auto rounded-3xl border-0 p-0 shadow-[0_20px_50px_rgba(15,23,42,0.18)]">
-          <DialogHeader className="border-b border-[#eef2f7] px-5 py-4">
+        <DialogContent className="flex max-h-[92dvh] max-w-lg flex-col gap-0 overflow-hidden rounded-3xl border-0 p-0 shadow-[0_20px_50px_rgba(15,23,42,0.18)]">
+          <DialogHeader className="shrink-0 border-b border-[#eef2f7] px-5 py-4">
             <DialogTitle className="text-lg font-bold">
               {t.pos.create.title}
             </DialogTitle>
           </DialogHeader>
-          <div className="space-y-5 bg-[#f8fafc] p-5">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[#f8fafc] p-4 overscroll-contain">
             <section className="space-y-2">
               <p className="font-semibold text-[#0f172a]">
                 {t.pos.create.orderType}
@@ -220,13 +220,13 @@ export function CreateOrderDialog({
                     type="button"
                     onClick={() => setOrderType(opt.id)}
                     className={cn(
-                      'flex min-h-20 flex-col items-center justify-center gap-1 rounded-2xl border text-sm font-semibold transition-all',
+                      'flex min-h-16 flex-col items-center justify-center gap-1 rounded-2xl border text-sm font-semibold transition-all',
                       orderType === opt.id
                         ? 'border-[#93c5fd] bg-[#eff6ff] text-[#2563eb] shadow-[0_4px_14px_rgba(59,130,246,0.18)]'
                         : 'border-[#e2e8f0] bg-white text-[#334155]',
                     )}
                   >
-                    <opt.icon className="size-6" />
+                    <opt.icon className="size-5" />
                     {opt.label}
                   </button>
                 ))}
@@ -261,7 +261,7 @@ export function CreateOrderDialog({
             <section className="space-y-2">
               <p className="font-semibold">{t.pos.create.customer}</p>
               <Input
-                className="h-12 rounded-2xl text-base"
+                className="h-11 rounded-2xl text-base"
                 placeholder={t.customers.phoneFirst.placeholder}
                 dir="ltr"
                 value={customerPhone}
@@ -274,12 +274,12 @@ export function CreateOrderDialog({
                 <p className="text-xs text-[#64748b]">{t.common.loading}</p>
               ) : null}
               {suggestions.length > 0 ? (
-                <ul className="max-h-44 space-y-1 overflow-y-auto rounded-2xl border border-[#e2e8f0] bg-white p-1">
+                <ul className="max-h-28 space-y-1 overflow-y-auto rounded-2xl border border-[#e2e8f0] bg-white p-1">
                   {suggestions.map((c) => (
                     <li key={c.id}>
                       <button
                         type="button"
-                        className="min-h-12 w-full rounded-xl px-3 py-2.5 text-start text-sm hover:bg-[#eff6ff]"
+                        className="min-h-11 w-full rounded-xl px-3 py-2 text-start text-sm hover:bg-[#eff6ff]"
                         onClick={() => void selectCustomer(c)}
                       >
                         <span className="font-semibold">{c.display_name}</span>
@@ -308,7 +308,7 @@ export function CreateOrderDialog({
 
               {showNameField ? (
                 <Input
-                  className="h-12 rounded-2xl text-base"
+                  className="h-11 rounded-2xl text-base"
                   placeholder={t.orders.hub.customerName}
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
@@ -323,7 +323,7 @@ export function CreateOrderDialog({
             {showTableRef ? (
               <section className="space-y-2">
                 <Input
-                  className="h-12 rounded-2xl text-base"
+                  className="h-11 rounded-2xl text-base"
                   placeholder={t.pos.create.tableRef}
                   value={dineInTableRef}
                   onChange={(e) => setDineInTableRef(e.target.value)}
@@ -343,7 +343,7 @@ export function CreateOrderDialog({
                         key={a.id}
                         type="button"
                         className={cn(
-                          'min-h-11 w-full rounded-xl border px-3 py-2 text-start text-sm',
+                          'min-h-10 w-full rounded-xl border px-3 py-2 text-start text-sm',
                           deliveryAddress === a.address_line
                             ? 'border-[#93c5fd] bg-[#eff6ff] text-[#2563eb]'
                             : 'border-[#eef2f7] bg-white',
@@ -365,7 +365,7 @@ export function CreateOrderDialog({
                   </div>
                 ) : null}
                 <Input
-                  className="h-12 rounded-2xl text-base"
+                  className="h-11 rounded-2xl text-base"
                   placeholder={
                     savedAddresses.length > 0
                       ? t.customers.phoneFirst.newAddress
@@ -375,21 +375,21 @@ export function CreateOrderDialog({
                   onChange={(e) => setDeliveryAddress(e.target.value)}
                 />
                 <Input
-                  className="h-12 rounded-2xl text-base"
+                  className="h-11 rounded-2xl text-base"
                   placeholder={t.pos.create.zone}
                   value={deliveryZone}
                   onChange={(e) => setDeliveryZone(e.target.value)}
                 />
                 <p className="font-semibold">{t.drivers.select}</p>
                 {drivers.length === 0 ? (
-                  <div className="rounded-2xl border border-dashed border-[#fdba74] bg-[#fff7ed] p-4 text-center">
-                    <p className="mb-3 text-sm font-semibold text-[#c2410c]">
+                  <div className="rounded-2xl border border-dashed border-[#fdba74] bg-[#fff7ed] p-3 text-center">
+                    <p className="mb-2 text-sm font-semibold text-[#c2410c]">
                       {t.drivers.empty}
                     </p>
                     {canManageDrivers ? (
                       <button
                         type="button"
-                        className="inline-flex min-h-12 items-center gap-2 rounded-2xl bg-[#f97316] px-4 text-sm font-semibold text-white"
+                        className="inline-flex min-h-11 items-center gap-2 rounded-2xl bg-[#f97316] px-4 text-sm font-semibold text-white"
                         onClick={() => setDriversOpen(true)}
                       >
                         <Plus className="size-4" />
@@ -399,7 +399,7 @@ export function CreateOrderDialog({
                   </div>
                 ) : (
                   <select
-                    className="h-12 w-full rounded-2xl border border-[#e2e8f0] bg-white px-3 text-base"
+                    className="h-11 w-full rounded-2xl border border-[#e2e8f0] bg-white px-3 text-base"
                     value={deliveryDriverId ?? ''}
                     onChange={(e) =>
                       setDeliveryDriverId(e.target.value || null)
@@ -430,18 +430,20 @@ export function CreateOrderDialog({
                 {t.pos.create.note}
               </p>
               <Input
-                className="h-12 rounded-2xl text-base"
+                className="h-11 rounded-2xl text-base"
                 placeholder={t.pos.lineExtras.orderNotePlaceholder}
                 value={orderNote}
                 onChange={(e) => setOrderNote(e.target.value)}
               />
               <p className="text-xs text-[#94a3b8]">{t.pos.create.noteHint}</p>
             </section>
+          </div>
 
-            <div className="flex gap-2 pt-1">
+          <div className="shrink-0 space-y-1 border-t border-[#eef2f7] bg-white p-3">
+            <div className="flex gap-2">
               <button
                 type="button"
-                className="min-h-14 flex-1 rounded-2xl text-sm font-semibold text-[#64748b] hover:bg-[#f1f5f9]"
+                className="min-h-12 flex-1 rounded-2xl text-sm font-semibold text-[#64748b] hover:bg-[#f1f5f9]"
                 onClick={() => onOpenChange(false)}
               >
                 {t.common.cancel}
@@ -449,7 +451,7 @@ export function CreateOrderDialog({
               <button
                 type="button"
                 disabled={submitting}
-                className="min-h-14 flex-[2] rounded-2xl bg-[#22c55e] text-base font-semibold text-white shadow-[0_6px_18px_rgba(34,197,94,0.35)] hover:bg-[#16a34a] disabled:opacity-50"
+                className="min-h-12 flex-[2] rounded-2xl bg-[#22c55e] text-base font-semibold text-white shadow-[0_6px_18px_rgba(34,197,94,0.35)] hover:bg-[#16a34a] disabled:opacity-50"
                 onClick={() => void submit()}
               >
                 {t.pos.create.submit}

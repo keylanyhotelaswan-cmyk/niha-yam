@@ -11,10 +11,17 @@ import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Alert, AlertDescription } from '@/shared/components/ui/alert'
+import { MoneyTotalsBreakdown } from '@/features/orders/components/MoneyTotalsBreakdown'
 import { finalizeSale } from '@/features/pos/api/pos.api'
 import { formatMoney } from '@/features/treasury/utils/format'
 import type { CartLine, PosPaymentMethod, TenderInput } from '@/features/pos/types'
 import type { PosOrderType } from '@/features/orders/types'
+import {
+  computeDiscountAmount,
+  netAfterDiscount,
+  roundMoney,
+} from '@/features/pos/utils/saleMoney'
+import { sortPaymentMethods } from '@/features/pos/utils/paymentMethods'
 import { t } from '@/shared/i18n'
 
 export type PaymentOrderMeta = {
@@ -41,10 +48,6 @@ type Props = {
 }
 
 type TenderRow = { methodId: string; amount: string }
-
-function roundMoney(value: number): number {
-  return Math.round(value * 100) / 100
-}
 
 function computeTotals(
   rows: TenderRow[],
@@ -81,6 +84,8 @@ function computeTotals(
   return { parsed, tenderSum, nonCash, cashTender, cashRequired, change, digitalOverpay }
 }
 
+export { sortPaymentMethods } from '@/features/pos/utils/paymentMethods'
+
 export function PaymentDialog({
   open,
   onOpenChange,
@@ -91,6 +96,10 @@ export function PaymentDialog({
   orderMeta,
   onSuccess,
 }: Props) {
+  const methods = useMemo(
+    () => sortPaymentMethods(paymentMethods),
+    [paymentMethods],
+  )
   const [rows, setRows] = useState<TenderRow[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -99,20 +108,15 @@ export function PaymentDialog({
   const [discountValue, setDiscountValue] = useState('')
   const [discountReason, setDiscountReason] = useState('')
 
-  const cashMethod = paymentMethods.find((m) => m.code === 'cash')
-  const defaultMethod = cashMethod ?? paymentMethods[0]
+  const defaultMethod = methods.find((m) => m.code === 'cash') ?? methods[0]
 
-  const discountAmount = useMemo(() => {
-    if (!discountEnabled) return 0
-    const value = Number(discountValue) || 0
-    if (value <= 0) return 0
-    if (discountType === 'percent') {
-      return roundMoney(Math.min(subtotal, (subtotal * value) / 100))
-    }
-    return roundMoney(Math.min(subtotal, value))
-  }, [discountEnabled, discountType, discountValue, subtotal])
-
-  const orderTotal = roundMoney(subtotal - discountAmount)
+  const discountAmount = computeDiscountAmount(
+    subtotal,
+    discountEnabled,
+    discountType,
+    Number(discountValue) || 0,
+  )
+  const orderTotal = netAfterDiscount(subtotal, discountAmount)
 
   useEffect(() => {
     if (open && defaultMethod) {
@@ -126,14 +130,27 @@ export function PaymentDialog({
     }
   }, [open, defaultMethod, subtotal])
 
+  // Keep primary tender aligned with post-discount due when discount changes.
+  useEffect(() => {
+    if (!open) return
+    setRows((prev) => {
+      if (prev.length === 0) return prev
+      const nextAmt = orderTotal.toFixed(2)
+      if (prev.length === 1 && prev[0]!.amount !== nextAmt) {
+        return [{ ...prev[0]!, amount: nextAmt }]
+      }
+      return prev
+    })
+  }, [open, orderTotal])
+
   const { parsed, tenderSum, cashTender, cashRequired, change, digitalOverpay } =
     useMemo(
-      () => computeTotals(rows, paymentMethods, orderTotal),
-      [rows, paymentMethods, orderTotal],
+      () => computeTotals(rows, methods, orderTotal),
+      [rows, methods, orderTotal],
     )
 
   function addRow() {
-    const next = paymentMethods.find((m) => !rows.some((r) => r.methodId === m.id))
+    const next = methods.find((m) => !rows.some((r) => r.methodId === m.id))
     if (!next) return
     setRows((prev) => [...prev, { methodId: next.id, amount: '' }])
   }
@@ -146,6 +163,10 @@ export function PaymentDialog({
 
   async function submit() {
     setError(null)
+    if (methods.length === 0) {
+      setError(t.pos.payment.noPaymentMethods)
+      return
+    }
     if (digitalOverpay) {
       setError(t.pos.payment.digitalOverpay)
       return
@@ -222,6 +243,12 @@ export function PaymentDialog({
             </Alert>
           ) : null}
 
+          {methods.length === 0 ? (
+            <Alert variant="destructive">
+              <AlertDescription>{t.pos.payment.noPaymentMethods}</AlertDescription>
+            </Alert>
+          ) : null}
+
           {canDiscount ? (
             <div className="space-y-2 rounded-md border p-3">
               <label className="flex items-center gap-2 text-sm">
@@ -267,9 +294,16 @@ export function PaymentDialog({
             </div>
           ) : null}
 
+          <MoneyTotalsBreakdown
+            subtotal={subtotal}
+            discountAmount={discountAmount}
+            total={orderTotal}
+            highlightRemaining
+          />
+
           <div className="bg-muted space-y-2 rounded-md p-3 text-sm">
             <div className="flex justify-between">
-              <span>{t.pos.payment.orderTotal}</span>
+              <span>{t.pos.payment.amountDue}</span>
               <span className="font-semibold">{formatMoney(orderTotal)}</span>
             </div>
             <div className="flex justify-between">
@@ -291,7 +325,7 @@ export function PaymentDialog({
                   value={row.methodId}
                   onChange={(e) => updateRow(index, { methodId: e.target.value })}
                 >
-                  {paymentMethods.map((m) => (
+                  {methods.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.name}
                     </option>
@@ -313,7 +347,7 @@ export function PaymentDialog({
             </div>
           ))}
 
-          {rows.length < paymentMethods.length ? (
+          {rows.length < methods.length ? (
             <Button type="button" variant="outline" size="sm" onClick={addRow}>
               {t.pos.payment.addTender}
             </Button>
@@ -332,7 +366,12 @@ export function PaymentDialog({
           >
             {t.common.cancel}
           </Button>
-          <Button type="button" loading={submitting} onClick={() => void submit()}>
+          <Button
+            type="button"
+            loading={submitting}
+            disabled={methods.length === 0}
+            onClick={() => void submit()}
+          >
             {t.pos.payment.confirmWithAmount(formatMoney(orderTotal))}
           </Button>
         </DialogFooter>

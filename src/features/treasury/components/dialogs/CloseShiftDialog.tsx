@@ -40,11 +40,21 @@ type Props = {
   open: boolean
   shift: OpenShift | null
   onOpenChange: (open: boolean) => void
+  /**
+   * When false (cashier), skip the F1 approval step — that stays an admin control surface.
+   * Backend pending/approval rules are unchanged; cashier just continues to count/close.
+   */
+  showApprovalStep?: boolean
 }
 
 type Step = 'approval' | 'count' | 'destination'
 
-export function CloseShiftDialog({ open, shift, onOpenChange }: Props) {
+export function CloseShiftDialog({
+  open,
+  shift,
+  onOpenChange,
+  showApprovalStep = true,
+}: Props) {
   const queryClient = useQueryClient()
   const expectedCash = shift?.expected_cash ?? 0
   const pendingSummary = parsePendingSummary(shift as Record<string, unknown> | null)
@@ -56,7 +66,7 @@ export function CloseShiftDialog({ open, shift, onOpenChange }: Props) {
   const pendingExpCount =
     expenseSummary?.count ?? Number(shift?.pending_expenses_count ?? 0)
   const totalPending = pendingCount + pendingExpCount
-  const [step, setStep] = useState<Step>('approval')
+  const [step, setStep] = useState<Step>('count')
   const [approvalOpen, setApprovalOpen] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const mutation = useCloseShift()
@@ -72,7 +82,9 @@ export function CloseShiftDialog({ open, shift, onOpenChange }: Props) {
 
   useEffect(() => {
     if (open) {
-      setStep(totalPending > 0 ? 'approval' : 'count')
+      setStep(
+        showApprovalStep && totalPending > 0 ? 'approval' : 'count',
+      )
       form.reset({
         actualCashCount: 0,
         differenceReason: '',
@@ -81,7 +93,7 @@ export function CloseShiftDialog({ open, shift, onOpenChange }: Props) {
       })
       setSubmitError(null)
     }
-  }, [open, form, totalPending])
+  }, [open, form, totalPending, showApprovalStep])
 
   const approveAllMut = useMutation({
     mutationFn: () => approvePendingForShift(shift!.id),

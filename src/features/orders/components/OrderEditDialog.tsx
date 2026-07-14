@@ -17,6 +17,7 @@ import { LineExtrasDialog } from '@/features/pos/components/LineExtrasDialog'
 import { OpenPriceDialog } from '@/features/pos/components/OpenPriceDialog'
 import { OrderMoneySummary } from '@/features/orders/components/OrderMoneySummary'
 import { usePosCart } from '@/features/pos/hooks/usePosCart'
+import { sortPaymentMethods } from '@/features/pos/utils/paymentMethods'
 import { usePosContext, usePosMenu } from '@/features/pos/hooks/usePosQueries'
 import { editPendingOrder } from '@/features/orders/api/orders.api'
 import {
@@ -55,19 +56,24 @@ function itemMatchesQuery(item: PosMenuItem, q: string): boolean {
   )
 }
 
-function previewMoney(subtotal: number, collected: number): OrderMoney {
-  const remaining = Math.max(subtotal - collected, 0)
+function previewMoney(
+  subtotal: number,
+  discountAmount: number,
+  collected: number,
+): OrderMoney {
+  const net = Math.max(0, subtotal - Math.max(0, discountAmount))
+  const remaining = Math.max(net - collected, 0)
   const payment_status =
-    collected <= 0 ? 'unpaid' : collected >= subtotal ? 'paid' : 'partial'
+    collected <= 0 ? 'unpaid' : collected >= net ? 'paid' : 'partial'
   return {
-    order_total: subtotal,
+    order_total: net,
     collected_amount: collected,
     remaining_amount: remaining,
     payment_status,
     pending_collections_count: 0,
     approved_collections_count: 0,
     has_approved_collection: false,
-    over_collected_amount: Math.max(collected - subtotal, 0),
+    over_collected_amount: Math.max(collected - net, 0),
   }
 }
 
@@ -111,7 +117,7 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
   const menuQuery = usePosMenu()
   const contextQuery = usePosContext()
   const cart = usePosCart()
-  const paymentMethods = contextQuery.data?.payment_methods ?? []
+  const paymentMethods = sortPaymentMethods(contextQuery.data?.payment_methods ?? [])
 
   const [search, setSearch] = useState('')
   const [activeCategoryId, setActiveCategoryId] = useState<string | 'favorites'>(
@@ -141,7 +147,11 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
   const lockedCollected = detail.money?.collected_amount ?? 0
   const tenderSum = tenderRows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
   const previewCollected = replaceTender ? tenderSum : lockedCollected
-  const liveMoney = previewMoney(cart.subtotal, previewCollected)
+  const liveMoney = previewMoney(
+    cart.subtotal,
+    Number(detail.order.discount_amount ?? 0),
+    previewCollected,
+  )
 
   useEffect(() => {
     if (!open || !menu) return
@@ -693,7 +703,11 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
               </div>
 
               <div className="shrink-0 space-y-3 border-t bg-white p-3">
-                <OrderMoneySummary money={liveMoney} />
+                <OrderMoneySummary
+                  money={liveMoney}
+                  subtotal={cart.subtotal}
+                  discountAmount={Number(detail.order.discount_amount ?? 0)}
+                />
                 {!replaceTender ? (
                   <p className="text-muted-foreground text-xs">
                     {t.orders.hub.collectedLocked}: {formatMoney(lockedCollected)}

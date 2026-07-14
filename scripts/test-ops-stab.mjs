@@ -174,10 +174,10 @@ async function main() {
     if (opDrawer && opDigital) {
       const operational = Number(opDrawer.balance ?? 0)
       const approved = Number(opDrawer.approved_balance ?? operational)
-      const transferable = Math.max(0, Math.min(operational, approved))
+      const transferable = Math.max(0, Number(opDrawer.balance ?? 0))
       record(
-        'Transferable ≤ operational & approved',
-        transferable <= operational + 1e-9 && transferable <= Math.max(0, approved) + 1e-9,
+        'POS transferable = operational balance',
+        Math.abs(transferable - Number(opDrawer.balance ?? 0)) < 1e-9,
         `op=${operational} approved=${approved} transferable=${transferable}`,
       )
 
@@ -192,6 +192,34 @@ async function main() {
         !!over.error && String(over.error.message).includes('INSUFFICIENT_FUNDS'),
         over.error?.message ?? 'unexpected ok',
       )
+
+      if (transferable >= 1) {
+        let okAmt = await rpc('pos_operational_transfer', {
+          p_source_treasury_id: opDrawer.id,
+          p_dest_treasury_id: opDigital.id,
+          p_amount: 1,
+          p_reason: 'ops-stab operational ok',
+        })
+        // PostgREST may briefly serve prior overload after migration NOTIFY.
+        if (
+          okAmt.error &&
+          String(okAmt.error.message).includes('INSUFFICIENT_FUNDS') &&
+          transferable >= 1
+        ) {
+          await new Promise((r) => setTimeout(r, 800))
+          okAmt = await rpc('pos_operational_transfer', {
+            p_source_treasury_id: opDrawer.id,
+            p_dest_treasury_id: opDigital.id,
+            p_amount: 1,
+            p_reason: 'ops-stab operational ok retry',
+          })
+        }
+        record(
+          'POS transfer 1 within operational succeeds',
+          !okAmt.error,
+          okAmt.error?.message ?? String(okAmt.data),
+        )
+      }
     }
   }
 

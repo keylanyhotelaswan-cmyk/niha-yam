@@ -32,9 +32,9 @@ type Props = {
 }
 
 /**
- * Ledger-derived shift breakdown (no summary tables). Shows the chain that
- * explains the final drawer balance: float → sales → drops/expenses → expected,
- * plus payment methods and collection-status totals when provided.
+ * Ledger-derived shift breakdown (admin approval metrics optional).
+ * Cashier mode (showApprovalMetrics=false): cash sales + expected use the same
+ * operational snapshot as the POS payment strip / drawer (pending+approved).
  */
 export function ShiftSummary({
   report,
@@ -42,16 +42,6 @@ export function ShiftSummary({
   paymentMethodTotals,
   showApprovalMetrics = false,
 }: Props) {
-  const rows: Row[] = [
-    ...(Math.abs(report.opening_balance) > 0.001
-      ? [{ label: t.treasury.shift.carriedOver, value: report.opening_balance }]
-      : []),
-    { label: t.treasury.shift.openingFloat, value: report.opening_float },
-    { label: t.treasury.shift.cashSales, value: report.cash_sales, tone: 'in' },
-    { label: t.treasury.shift.cashDrops, value: -report.cash_drops, tone: 'out' },
-    { label: t.treasury.shift.expensesOut, value: -report.expenses, tone: 'out' },
-  ]
-
   // Prefer order-derived totals (pending + approved). Fall back to shift pending-only.
   const methods = (
     paymentMethodTotals ??
@@ -62,6 +52,32 @@ export function ShiftSummary({
       amount: Number(m.amount),
     }))
   ).filter((m) => Math.abs(Number(m.amount)) > 0.001)
+
+  const operationalCashSales = methods
+    .filter((m) => m.code === 'cash')
+    .reduce((sum, m) => sum + Number(m.amount ?? 0), 0)
+
+  const cashSales = showApprovalMetrics
+    ? Number(report.cash_sales ?? 0)
+    : paymentMethodTotals != null
+      ? operationalCashSales
+      : Number(report.cash_sales ?? 0)
+
+  const expectedCash = showApprovalMetrics
+    ? Number(report.expected_cash ?? 0)
+    : report.operational_drawer_balance != null
+      ? Number(report.operational_drawer_balance)
+      : Number(report.expected_cash ?? 0)
+
+  const rows: Row[] = [
+    ...(Math.abs(report.opening_balance) > 0.001
+      ? [{ label: t.treasury.shift.carriedOver, value: report.opening_balance }]
+      : []),
+    { label: t.treasury.shift.openingFloat, value: report.opening_float },
+    { label: t.treasury.shift.cashSales, value: cashSales, tone: 'in' },
+    { label: t.treasury.shift.cashDrops, value: -report.cash_drops, tone: 'out' },
+    { label: t.treasury.shift.expensesOut, value: -report.expenses, tone: 'out' },
+  ]
 
   const status =
     collectionStatusTotals ??
@@ -95,7 +111,7 @@ export function ShiftSummary({
         ))}
         <div className="mt-1 flex items-center justify-between border-t pt-2 font-semibold">
           <span>{t.treasury.shift.expectedCash}</span>
-          <span>{formatMoney(report.expected_cash)}</span>
+          <span>{formatMoney(expectedCash)}</span>
         </div>
         {showApprovalMetrics && report.approved_revenue != null ? (
           <div className="flex items-center justify-between">

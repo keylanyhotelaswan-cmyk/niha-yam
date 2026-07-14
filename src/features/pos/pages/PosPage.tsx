@@ -210,9 +210,12 @@ export function PosPage() {
       fetchOrdersForPos({
         search: search || undefined,
         shiftId: shiftId ?? undefined,
-        hubOnly: true,
+        // With an open shift: show ALL shift orders (any cashier). hubOnly hides
+        // paid+completed tickets and looked like "orders disappeared" after user switch.
+        hubOnly: !shiftId,
       }),
     refetchInterval: 30_000,
+    enabled: true,
   })
   const {
     collectionStatusTotals,
@@ -224,6 +227,38 @@ export function PosPage() {
     shiftId,
     allowDayScope: allowDayTotals,
   })
+
+  /** Hub strips: cash from shift collections; digital cards from operational treasuries (incl. transfers). */
+  const paymentStripRows = useMemo(() => {
+    const rows: Array<{
+      payment_method_id?: string
+      code: string
+      name?: string
+      amount: number
+    }> = []
+    for (const r of collectionPaymentTotals) {
+      if (r.code === 'cash') rows.push(r)
+    }
+    for (const tr of ctx?.operational_treasuries ?? []) {
+      if (tr.code === 'drawer') continue
+      const amount = Number(tr.balance ?? 0)
+      if (Math.abs(amount) <= 0.001) continue
+      rows.push({
+        payment_method_id: tr.id,
+        code: tr.code,
+        name: tr.name,
+        amount,
+      })
+    }
+    // Any non-cash collection method not represented by an operational treasury card
+    for (const r of collectionPaymentTotals) {
+      if (r.code === 'cash') continue
+      if (rows.some((x) => x.code === r.code)) continue
+      if (Math.abs(Number(r.amount)) <= 0.001) continue
+      rows.push(r)
+    }
+    return rows
+  }, [collectionPaymentTotals, ctx?.operational_treasuries])
 
   useEffect(() => {
     saveHeldDrafts(held)
@@ -491,7 +526,7 @@ export function PosPage() {
                 </div>
               ) : null}
               <PaymentMethodTotalsStrip
-                rows={collectionPaymentTotals}
+                rows={paymentStripRows}
                 compact
               />
             </div>
@@ -954,6 +989,7 @@ export function PosPage() {
       <CloseShiftDialog
         open={closeShiftOpen}
         shift={shift}
+        showApprovalStep={Boolean(ctx.can_approve_collections)}
         onOpenChange={(open) => {
           setCloseShiftOpen(open)
           if (!open) {

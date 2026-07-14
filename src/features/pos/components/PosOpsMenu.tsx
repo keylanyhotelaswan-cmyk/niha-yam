@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import {
   Dialog,
   DialogContent,
@@ -182,19 +181,20 @@ export function PosOpsMenu({
         open={cashDropOpen}
         onOpenChange={(next) => {
           setCashDropOpen(next)
-          if (!next) {
-            refreshContext()
-            toast.success(t.treasury.cashDrop.done)
-          }
+          if (!next) refreshContext()
         }}
       />
 
       <PosTransferDialog
         open={transferOpen}
         treasuries={ctx.operational_treasuries}
+        shiftId={shift?.id ?? null}
         onOpenChange={(next) => {
           setTransferOpen(next)
-          if (!next) refreshContext()
+          if (!next) {
+            refreshContext()
+            void queryClient.invalidateQueries({ queryKey: ['collection-totals'] })
+          }
         }}
       />
 

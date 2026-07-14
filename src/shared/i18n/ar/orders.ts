@@ -60,6 +60,10 @@ export const orders = {
   },
   money: {
     total: 'إجمالي الطلب',
+    subtotal: 'إجمالي الطلب',
+    discount: 'الخصم',
+    netTotal: 'الإجمالي بعد الخصم',
+    due: 'المطلوب تحصيله',
     collected: 'تم تحصيله',
     remaining: 'المتبقي',
     status: 'حالة التحصيل',

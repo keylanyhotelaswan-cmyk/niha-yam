@@ -29,6 +29,8 @@ import {
 } from '@/features/orders/components/PaymentBreakdownBadges'
 import { formatMoney, formatDateTime } from '@/features/treasury/utils/format'
 import { noteDisplayLines } from '@/features/pos/utils/line-note'
+import { sortPaymentMethods } from '@/features/pos/utils/paymentMethods'
+import { MoneyTotalsBreakdown } from '@/features/orders/components/MoneyTotalsBreakdown'
 import { usePosContext } from '@/features/pos/hooks/usePosQueries'
 import { posKeys } from '@/features/pos/hooks/pos.keys'
 import { useSession } from '@/shared/session/SessionProvider'
@@ -56,7 +58,7 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
   const queryClient = useQueryClient()
   const { isManager } = useSession()
   const ctx = usePosContext().data
-  const paymentMethods = ctx?.payment_methods ?? []
+  const paymentMethods = sortPaymentMethods(ctx?.payment_methods ?? [])
   const cashPm = paymentMethods.find((p) => p.code === 'cash') ?? paymentMethods[0]
   const [editOpen, setEditOpen] = useState(false)
   const [collectOpen, setCollectOpen] = useState(false)
@@ -176,7 +178,11 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
                   )}
                 </div>
 
-                <OrderMoneySummary money={detail.money} />
+                <OrderMoneySummary
+                  money={detail.money}
+                  subtotal={detail.order.subtotal}
+                  discountAmount={detail.order.discount_amount}
+                />
 
                 <div className="rounded-2xl border border-white bg-white p-4 text-xs shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
                   <p className="mb-2 text-sm font-bold">
@@ -618,9 +624,23 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
           <DialogHeader>
             <DialogTitle>{t.orders.hub.collectRemaining}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-[#64748b]">
-            {t.orders.money.remaining}: {formatMoney(remaining)}
-          </p>
+          {detail ? (
+            <MoneyTotalsBreakdown
+              subtotal={detail.order.subtotal}
+              discountAmount={detail.order.discount_amount}
+              total={detail.money?.order_total ?? detail.order.total}
+              collected={detail.money?.collected_amount ?? 0}
+              remaining={remaining}
+              highlightRemaining
+            />
+          ) : (
+            <p className="text-sm text-[#64748b]">
+              {t.orders.money.remaining}: {formatMoney(remaining)}
+            </p>
+          )}
+          {paymentMethods.length === 0 ? (
+            <p className="text-destructive text-sm">{t.pos.payment.noPaymentMethods}</p>
+          ) : null}
           <select
             className="h-12 w-full rounded-2xl border border-[#e2e8f0] bg-white px-3 text-sm"
             value={collectMethodId}
@@ -642,7 +662,7 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
           <Button
             type="button"
             className="min-h-12 rounded-2xl bg-[#22c55e] hover:bg-[#16a34a]"
-            disabled={collectMut.isPending}
+            disabled={collectMut.isPending || paymentMethods.length === 0}
             onClick={() => collectMut.mutate()}
           >
             {t.orders.hub.collectRemaining}
