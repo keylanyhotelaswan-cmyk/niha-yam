@@ -204,3 +204,53 @@ export type UpsertPrintSettingsInput = {
   restaurantPhone?: string | null
   restaurantAddress?: string | null
 }
+
+export type PrintDiagnoseCheck = {
+  id: string
+  ok: boolean
+  label: string
+  detail: string | null
+}
+
+export type PrintSystemDiagnosis = {
+  ready: boolean
+  checked_at: string
+  online_bridge: {
+    id: string
+    device_name: string | null
+    display_name: string | null
+    version: string | null
+    last_heartbeat_at: string | null
+    windows_username: string | null
+  } | null
+  checks: PrintDiagnoseCheck[]
+  pending_jobs: Array<{
+    id: string
+    reference: string
+    status: string
+    attempt_count: number
+    job_bridge_id: string | null
+    printer_id: string | null
+    printer_bridge_id: string | null
+    windows_printer_name: string | null
+    reject_reason: string
+  }>
+  printers: Array<{
+    id: string
+    name: string
+    role: string
+    bridge_id: string | null
+    windows_printer_name: string | null
+    bridge_online: boolean
+  }>
+  bridges: Array<{
+    id: string
+    device_name: string | null
+    is_active: boolean
+    online: boolean
+    version: string | null
+    last_heartbeat_at: string | null
+    device_count: number
+  }>
+}
+

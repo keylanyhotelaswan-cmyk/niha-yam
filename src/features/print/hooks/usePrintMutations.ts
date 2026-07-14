@@ -59,6 +59,20 @@ export function useEnqueueTestPrint() {
   })
 }
 
+export function useDiagnosePrintSystem() {
+  return useMutation({
+    mutationFn: () => api.diagnosePrintSystem(),
+  })
+}
+
+export function useSyncPrintStationBindings() {
+  const invalidate = useInvalidateAll()
+  return useMutation({
+    mutationFn: () => api.syncPrintStationBindings(),
+    onSuccess: invalidate,
+  })
+}
+
 export function useEnqueueLayoutPreviewPrint() {
   const invalidate = useInvalidateAll()
   return useMutation({

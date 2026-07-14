@@ -12,4 +12,5 @@ export const printKeys = {
     [...printKeys.all, 'documentLayout', docType] as const,
   documentPreview: (docType: string) =>
     [...printKeys.all, 'documentPreview', docType] as const,
+  diagnose: () => [...printKeys.all, 'diagnose'] as const,
 }

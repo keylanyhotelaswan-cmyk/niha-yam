@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { BridgeDownloadButton } from '@/features/print/components/BridgeDownloadButton'
+import { DiagnosticsTab } from '@/features/print/components/DiagnosticsTab'
 import { HealthTab } from '@/features/print/components/HealthTab'
 import { LayoutTab } from '@/features/print/components/LayoutTab'
 import { LogsTab } from '@/features/print/components/LogsTab'
@@ -26,6 +27,7 @@ import { t } from '@/shared/i18n'
 
 const TABS = [
   'health',
+  'diagnostics',
   'printers',
   'layout',
   'settings',
@@ -117,6 +119,8 @@ export function PrintCenterPage() {
           health={health.data!}
           expiredJobs={expiredJobs.data ?? []}
         />
+      ) : tab === 'diagnostics' ? (
+        <DiagnosticsTab printers={printers.data ?? []} />
       ) : tab === 'printers' ? (
         <PrintersTab printers={printers.data ?? []} />
       ) : tab === 'layout' ? (

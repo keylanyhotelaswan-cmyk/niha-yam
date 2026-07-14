@@ -9,6 +9,7 @@ import type {
   PrintJobRow,
   PrintPreview,
   PrintSettings,
+  PrintSystemDiagnosis,
   PrintTemplateRow,
   UpsertPrinterInput,
   UpsertPrintSettingsInput,
@@ -169,6 +170,25 @@ export async function enqueueTestPrint(printerId: string): Promise<string> {
   })
   if (error) throw wrap(error)
   return data as string
+}
+
+export async function diagnosePrintSystem(): Promise<PrintSystemDiagnosis> {
+  const { data, error } = await rpc('diagnose_print_system')
+  if (error) throw wrap(error)
+  return data as PrintSystemDiagnosis
+}
+
+export async function syncPrintStationBindings(): Promise<{
+  ok?: boolean
+  updated?: number
+  renamed?: number
+  bridge_id?: string
+  reason?: string
+  picked_windows_name?: string | null
+}> {
+  const { data, error } = await rpc('sync_print_station_bindings')
+  if (error) throw wrap(error)
+  return (data as Record<string, unknown>) ?? {}
 }
 
 /** OES: shift handover slip via Bridge (kind = shift_handover). */
