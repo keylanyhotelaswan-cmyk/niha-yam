@@ -145,22 +145,48 @@ internal static class LayoutSnapshotRender
                 if (isKitchen)
                     FieldLabeled("order_reference", Str(snap, "order_reference"));
                 else
+                {
                     FieldLabeled("invoice_number", Str(snap, "order_reference") ?? job.Reference);
-                Field("datetime", Str(snap, "datetime") ?? DateTime.Now.ToString("yyyy/MM/dd hh:mm:ss tt"));
-                FieldLabeled("cashier", Str(snap, "cashier"));
-                FieldLabeled("order_type", Str(snap, "order_type_ar") ?? Str(snap, "order_type"));
+                    FieldLabeled("order_reference", Str(snap, "order_reference"));
+                }
                 if (isKitchen)
                     FieldLabeled("kitchen_ticket", Str(snap, "kitchen_ticket"));
+                FieldLabeled("order_type", Str(snap, "order_type_ar") ?? Str(snap, "order_type"));
+                FieldLabeled("created_by_name",
+                    Str(snap, "created_by_name") ?? Str(snap, "cashier"));
+                if (!isKitchen)
+                {
+                    FieldLabeled("last_edited_by_name", Str(snap, "last_edited_by_name"));
+                    FieldLabeled("collected_by_name", Str(snap, "collected_by_name"));
+                }
+                FieldLabeled("created_at", Str(snap, "created_at"));
+                if (!isKitchen)
+                {
+                    FieldLabeled("last_edited_at", Str(snap, "last_edited_at"));
+                    FieldLabeled("collected_at", Str(snap, "collected_at"));
+                }
+                FieldLabeled("printed_at",
+                    Str(snap, "printed_at") ?? Str(snap, "datetime"));
+                // Legacy templates still using cashier/datetime field ids
+                FieldLabeled("cashier", Str(snap, "created_by_name") ?? Str(snap, "cashier"));
+                Field("datetime", Str(snap, "printed_at") ?? Str(snap, "datetime"));
                 return wrote;
             case "customer":
             case "customer_or_table":
                 FieldLabeled("table_ref", Str(snap, "table_ref"));
                 FieldLabeled("customer_name", Str(snap, "customer_name"));
+                FieldLabeled("customer_phone", Str(snap, "customer_phone"));
+                FieldLabeled("delivery_zone", Str(snap, "delivery_zone"));
+                FieldLabeled("delivery_address", Str(snap, "delivery_address"));
                 if (!isKitchen)
-                {
-                    FieldLabeled("customer_phone", Str(snap, "customer_phone"));
-                    FieldLabeled("delivery_address", Str(snap, "delivery_address"));
-                }
+                    FieldLabeled("delivery_notes", Str(snap, "delivery_notes"));
+                FieldLabeled("driver_name", Str(snap, "driver_name"));
+                return wrote;
+            case "ops":
+                FieldLabeled("shift_reference", Str(snap, "shift_reference"));
+                FieldLabeled("branch_name",
+                    Str(snap, "branch_name") ?? Str(snap, "restaurant_name"));
+                FieldLabeled("device_name", Str(snap, "device_name"));
                 return wrote;
             case "lines":
                 if (!snap.TryGetProperty("lines", out var lines) || lines.ValueKind != JsonValueKind.Array)
@@ -275,6 +301,34 @@ internal static class LayoutSnapshotRender
             case "payment":
                 if (isKitchen) return false;
                 {
+                    var linesF = section.GetField("payment_lines");
+                    if (linesF is not null &&
+                        snap.TryGetProperty("payments", out var pays) &&
+                        pays.ValueKind == JsonValueKind.Array)
+                    {
+                        var header = ResolveLabelOnly(linesF);
+                        if (!string.IsNullOrWhiteSpace(header))
+                        {
+                            doc.Line(header!, linesF.Align, fontSize: linesF.FontPt, bold: linesF.Bold);
+                            wrote = true;
+                        }
+                        foreach (var p in pays.EnumerateArray())
+                        {
+                            var payName = Str(p, "method");
+                            if (string.IsNullOrWhiteSpace(payName)) continue;
+                            JsonElement amtEl = default;
+                            if (p.TryGetProperty("net_amount", out var na) && na.ValueKind == JsonValueKind.Number)
+                                amtEl = na;
+                            else if (p.TryGetProperty("amount", out var am) && am.ValueKind == JsonValueKind.Number)
+                                amtEl = am;
+                            else
+                                continue;
+                            doc.Columns(payName!, Money(amtEl, cur), linesF.FontPt, bold: linesF.Bold);
+                            wrote = true;
+                        }
+                        if (wrote) doc.Feed(1);
+                    }
+
                     var methodF = section.GetField("method");
                     var statusF = section.GetField("status");
                     var changeF = section.GetField("change");

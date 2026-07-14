@@ -110,6 +110,18 @@ public sealed class SupabaseBridgeApi
         return JsonSerializer.Deserialize<List<ClaimedJob>>(text, JsonOpts) ?? [];
     }
 
+    /// <summary>Temporary: why claim returns empty (stale printer.bridge_id, etc.).</summary>
+    public async Task<string> DiagnoseClaimAsync(CancellationToken ct)
+    {
+        EnsureToken();
+        var body = new { p_token = _cfg.BridgeToken };
+        using var res = await _http.PostAsJsonAsync("rest/v1/rpc/diagnose_bridge_claim", body, ct);
+        var text = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+            throw new InvalidOperationException($"diagnose_bridge_claim failed: {text}");
+        return text;
+    }
+
     public async Task ReportAsync(
         Guid jobId,
         bool success,

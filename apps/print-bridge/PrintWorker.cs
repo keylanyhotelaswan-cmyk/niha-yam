@@ -93,6 +93,7 @@ public sealed class PrintWorker
     private readonly OfflineStore _offline;
     private CancellationTokenSource? _cts;
     private Task? _loop;
+    private DateTimeOffset _lastEmptyClaimDiagAt = DateTimeOffset.MinValue;
 
     public event Action<BridgeLinkState>? StateChanged;
     public event Action<bool, string>? PrintFinished;
@@ -159,6 +160,33 @@ public sealed class PrintWorker
 
                     await FlushOfflineAsync(api, ct);
                     var jobs = await api.ClaimAsync(10, ct);
+                    // Temporary poll diagnostics (remove after claim bug freeze)
+                    _log.Info(
+                        $"poll claim: found={jobs.Count} bridgeId={_cfg.BridgeId ?? "?"} " +
+                        $"tokenPrefix={(_cfg.BridgeToken is { Length: >= 8 } t ? t[..8] : "?")}");
+                    if (jobs.Count == 0)
+                    {
+                        if (DateTimeOffset.UtcNow - _lastEmptyClaimDiagAt > TimeSpan.FromSeconds(30))
+                        {
+                            _lastEmptyClaimDiagAt = DateTimeOffset.UtcNow;
+                            try
+                            {
+                                var diag = await api.DiagnoseClaimAsync(ct);
+                                _log.Info($"claim_diag: {diag}");
+                            }
+                            catch (Exception dex)
+                            {
+                                _log.Error($"claim_diag: {dex.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (var j in jobs)
+                            _log.Info(
+                                $"claimed job {j.Reference ?? j.Id.ToString()} " +
+                                $"printerId={j.Printer?.Id} win={ResolvePrinterName(j)}");
+                    }
                     foreach (var job in jobs)
                         await ProcessJobAsync(api, job, ct);
                 }
