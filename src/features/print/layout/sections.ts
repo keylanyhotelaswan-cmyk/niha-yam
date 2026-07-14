@@ -51,9 +51,23 @@ export type DocumentLayout = {
 
 export type FieldDef = { id: string; labelKey: string }
 
+/** Visual groups in the designer (reorder still per-section). */
+export const PRINT_FIELD_GROUPS = [
+  'restaurant',
+  'order',
+  'customer',
+  'lines',
+  'totals',
+  'payment',
+  'ops',
+  'other',
+] as const
+export type PrintFieldGroup = (typeof PRINT_FIELD_GROUPS)[number]
+
 export type SectionDef = {
   id: string
   labelKey: string
+  group: PrintFieldGroup
   fields: FieldDef[]
 }
 
@@ -82,16 +96,19 @@ export const RECEIPT_SECTIONS: SectionDef[] = [
   {
     id: 'restaurant_name',
     labelKey: 'restaurant_name',
+    group: 'restaurant',
     fields: [{ id: 'name', labelKey: 'name' }],
   },
   {
     id: 'slogan',
     labelKey: 'slogan',
+    group: 'restaurant',
     fields: [{ id: 'text', labelKey: 'slogan_text' }],
   },
   {
     id: 'branch_info',
     labelKey: 'branch_info',
+    group: 'restaurant',
     fields: [
       { id: 'address', labelKey: 'address' },
       { id: 'phone', labelKey: 'phone' },
@@ -100,26 +117,38 @@ export const RECEIPT_SECTIONS: SectionDef[] = [
   {
     id: 'invoice_meta',
     labelKey: 'invoice_meta',
+    group: 'order',
     fields: [
       { id: 'invoice_number', labelKey: 'invoice_number' },
-      { id: 'datetime', labelKey: 'datetime' },
-      { id: 'cashier', labelKey: 'cashier' },
+      { id: 'order_reference', labelKey: 'order_reference' },
       { id: 'order_type', labelKey: 'order_type' },
+      { id: 'created_by_name', labelKey: 'created_by_name' },
+      { id: 'last_edited_by_name', labelKey: 'last_edited_by_name' },
+      { id: 'collected_by_name', labelKey: 'collected_by_name' },
+      { id: 'created_at', labelKey: 'created_at' },
+      { id: 'last_edited_at', labelKey: 'last_edited_at' },
+      { id: 'collected_at', labelKey: 'collected_at' },
+      { id: 'printed_at', labelKey: 'printed_at' },
     ],
   },
   {
     id: 'customer',
     labelKey: 'customer',
+    group: 'customer',
     fields: [
       { id: 'customer_name', labelKey: 'customer_name' },
       { id: 'customer_phone', labelKey: 'customer_phone' },
+      { id: 'delivery_zone', labelKey: 'delivery_zone' },
       { id: 'delivery_address', labelKey: 'delivery_address' },
+      { id: 'delivery_notes', labelKey: 'delivery_notes' },
+      { id: 'driver_name', labelKey: 'driver_name' },
       { id: 'table_ref', labelKey: 'table_ref' },
     ],
   },
   {
     id: 'lines',
     labelKey: 'lines',
+    group: 'lines',
     fields: [
       { id: 'item_line', labelKey: 'item_line' },
       { id: 'price', labelKey: 'price' },
@@ -130,6 +159,7 @@ export const RECEIPT_SECTIONS: SectionDef[] = [
   {
     id: 'totals',
     labelKey: 'totals',
+    group: 'totals',
     fields: [
       { id: 'subtotal', labelKey: 'subtotal' },
       { id: 'discount', labelKey: 'discount' },
@@ -140,20 +170,34 @@ export const RECEIPT_SECTIONS: SectionDef[] = [
   {
     id: 'payment',
     labelKey: 'payment',
+    group: 'payment',
     fields: [
+      { id: 'payment_lines', labelKey: 'payment_lines' },
       { id: 'method', labelKey: 'payment_method' },
       { id: 'status', labelKey: 'payment_status' },
       { id: 'change', labelKey: 'change' },
     ],
   },
   {
+    id: 'ops',
+    labelKey: 'ops',
+    group: 'ops',
+    fields: [
+      { id: 'shift_reference', labelKey: 'shift_reference' },
+      { id: 'branch_name', labelKey: 'branch_name' },
+      { id: 'device_name', labelKey: 'device_name' },
+    ],
+  },
+  {
     id: 'qr',
     labelKey: 'qr',
+    group: 'other',
     fields: [{ id: 'code', labelKey: 'qr_code' }],
   },
   {
     id: 'thank_you',
     labelKey: 'thank_you',
+    group: 'other',
     fields: [{ id: 'message', labelKey: 'thank_you_message' }],
   },
 ]
@@ -162,35 +206,45 @@ export const KITCHEN_SECTIONS: SectionDef[] = [
   {
     id: 'restaurant_name',
     labelKey: 'restaurant_name',
+    group: 'restaurant',
     fields: [{ id: 'name', labelKey: 'name' }],
   },
   {
     id: 'ticket_header',
     labelKey: 'ticket_header',
+    group: 'other',
     fields: [{ id: 'title', labelKey: 'ticket_title' }],
   },
   {
     id: 'order_meta',
     labelKey: 'order_meta',
+    group: 'order',
     fields: [
       { id: 'order_reference', labelKey: 'order_reference' },
-      { id: 'datetime', labelKey: 'datetime' },
-      { id: 'cashier', labelKey: 'cashier' },
-      { id: 'order_type', labelKey: 'order_type' },
       { id: 'kitchen_ticket', labelKey: 'kitchen_ticket' },
+      { id: 'order_type', labelKey: 'order_type' },
+      { id: 'created_by_name', labelKey: 'created_by_name' },
+      { id: 'created_at', labelKey: 'created_at' },
+      { id: 'printed_at', labelKey: 'printed_at' },
     ],
   },
   {
     id: 'customer_or_table',
     labelKey: 'customer_or_table',
+    group: 'customer',
     fields: [
       { id: 'table_ref', labelKey: 'table_ref' },
       { id: 'customer_name', labelKey: 'customer_name' },
+      { id: 'customer_phone', labelKey: 'customer_phone' },
+      { id: 'delivery_zone', labelKey: 'delivery_zone' },
+      { id: 'delivery_address', labelKey: 'delivery_address' },
+      { id: 'driver_name', labelKey: 'driver_name' },
     ],
   },
   {
     id: 'lines',
     labelKey: 'lines',
+    group: 'lines',
     fields: [
       { id: 'item_line', labelKey: 'item_line' },
       { id: 'modifiers', labelKey: 'modifiers' },
@@ -200,11 +254,13 @@ export const KITCHEN_SECTIONS: SectionDef[] = [
   {
     id: 'order_note',
     labelKey: 'order_note',
+    group: 'other',
     fields: [{ id: 'note', labelKey: 'order_note_text' }],
   },
   {
     id: 'thank_you',
     labelKey: 'thank_you',
+    group: 'other',
     fields: [{ id: 'message', labelKey: 'thank_you_message' }],
   },
 ]
@@ -296,8 +352,9 @@ export function defaultLayoutFor(type: PrintDocumentType): DocumentLayout {
         0,
         2,
         inheritFields(17, 'right', true, defs.find((d) => d.id === 'order_meta')!.fields, {
-          datetime: { bold: false, font_pt: 15 },
-          cashier: { bold: false },
+          created_at: { bold: false, font_pt: 15 },
+          printed_at: { visible: false, bold: false, font_pt: 15 },
+          created_by_name: { bold: false },
           order_type: { bold: false },
         }),
       ),
@@ -308,7 +365,12 @@ export function defaultLayoutFor(type: PrintDocumentType): DocumentLayout {
         true,
         0,
         2,
-        inheritFields(17, 'right', true, defs.find((d) => d.id === 'customer_or_table')!.fields),
+        inheritFields(17, 'right', true, defs.find((d) => d.id === 'customer_or_table')!.fields, {
+          delivery_address: { visible: false },
+          customer_phone: { bold: false },
+          delivery_zone: { bold: false },
+          driver_name: { bold: false },
+        }),
       ),
       lines: s(
         true,
@@ -387,8 +449,14 @@ export function defaultLayoutFor(type: PrintDocumentType): DocumentLayout {
       0,
       2,
       inheritFields(16, 'right', true, defs.find((d) => d.id === 'invoice_meta')!.fields, {
-        datetime: { bold: false, font_pt: 14 },
-        cashier: { bold: false },
+        order_reference: { visible: false },
+        created_at: { bold: false, font_pt: 14 },
+        last_edited_at: { visible: false, bold: false, font_pt: 14 },
+        collected_at: { bold: false, font_pt: 14 },
+        printed_at: { visible: false, bold: false, font_pt: 14 },
+        created_by_name: { bold: false },
+        last_edited_by_name: { visible: false, bold: false },
+        collected_by_name: { bold: false },
         order_type: { bold: false },
       }),
     ),
@@ -430,11 +498,28 @@ export function defaultLayoutFor(type: PrintDocumentType): DocumentLayout {
     payment: s(
       true,
       15,
-      'center',
+      'right',
       true,
       2,
       2,
-      inheritFields(15, 'center', true, defs.find((d) => d.id === 'payment')!.fields),
+      inheritFields(15, 'right', true, defs.find((d) => d.id === 'payment')!.fields, {
+        method: { visible: false, align: 'center' },
+        status: { align: 'center' },
+        change: { align: 'center' },
+      }),
+    ),
+    ops: s(
+      true,
+      14,
+      'right',
+      false,
+      2,
+      2,
+      inheritFields(14, 'right', false, defs.find((d) => d.id === 'ops')!.fields, {
+        shift_reference: { visible: false },
+        branch_name: { visible: false },
+        device_name: { visible: false },
+      }),
     ),
     qr: s(
       false,
@@ -507,17 +592,18 @@ export function mergeLayout(
   const base = defaultLayoutFor(type)
   if (!incoming || typeof incoming !== 'object') return base
 
+  const normalized = normalizeLegacyFields(incoming)
   const defs = sectionsForDocumentType(type)
   const known = new Set(defs.map((d) => d.id))
-  let order: string[] = Array.isArray(incoming.section_order)
-    ? incoming.section_order.filter((id): id is string => typeof id === 'string' && known.has(id))
+  let order: string[] = Array.isArray(normalized.section_order)
+    ? normalized.section_order.filter((id): id is string => typeof id === 'string' && known.has(id))
     : [...base.section_order]
   for (const id of base.section_order) {
     if (!order.includes(id)) order.push(id)
   }
 
   const sections: Record<string, SectionStyle> = {}
-  const raw = incoming.sections ?? {}
+  const raw = normalized.sections ?? {}
   for (const def of defs) {
     const cur = base.sections[def.id]!
     const patch = raw[def.id] as Partial<SectionStyle> | undefined
@@ -553,11 +639,45 @@ export function mergeLayout(
   }
 
   const paper =
-    incoming.paper_width_mm === 58 || incoming.paper_width_mm === 80
-      ? incoming.paper_width_mm
+    normalized.paper_width_mm === 58 || normalized.paper_width_mm === 80
+      ? normalized.paper_width_mm
       : base.paper_width_mm
 
   return { version: 2, paper_width_mm: paper, section_order: order, sections }
+}
+
+/** Map legacy cashier/datetime fields into created_by_name / printed_at. */
+function normalizeLegacyFields(
+  incoming: Partial<DocumentLayout>,
+): Partial<DocumentLayout> {
+  const sections = incoming.sections
+  if (!sections || typeof sections !== 'object') return incoming
+  const nextSections: Record<string, SectionStyle> = { ...(sections as Record<string, SectionStyle>) }
+  for (const secId of ['invoice_meta', 'order_meta'] as const) {
+    const sec = nextSections[secId]
+    if (!sec?.fields) continue
+    const fields = { ...sec.fields }
+    if (fields.cashier && !fields.created_by_name) {
+      const c = { ...fields.cashier }
+      if (!c.label_ar || c.label_ar === 'كاشير' || c.label_ar === 'الكاشير') {
+        c.label_ar = 'أنشأ الطلب'
+        c.label_en = c.label_en || 'Created by'
+      }
+      fields.created_by_name = c
+    }
+    delete fields.cashier
+    if (fields.datetime && !fields.printed_at) {
+      const d = { ...fields.datetime }
+      if (!d.label_ar) {
+        d.label_ar = 'وقت الطباعة'
+        d.label_en = d.label_en || 'Printed at'
+      }
+      fields.printed_at = d
+    }
+    delete fields.datetime
+    nextSections[secId] = { ...sec, fields }
+  }
+  return { ...incoming, sections: nextSections }
 }
 
 export function moveSection(

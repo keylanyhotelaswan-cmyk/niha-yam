@@ -174,16 +174,20 @@ Current module: **M3 Menu & Products** — categories, items, modifiers, tax rat
 
 ## Deployment (Vercel)
 
-Connect the repository to Vercel. Set **only** these environment variables (Production / Preview / Development):
+**Official production project:** `niha-yam` → https://niha-yam.vercel.app  
+**Repo:** `keylanyhotelaswan-cmyk/niha-yam` · branch `main`  
+**Baseline:** [docs/release-operational-v1.1.md](./docs/release-operational-v1.1.md) (`v1.1.0-production`)
+
+Set **only** these environment variables (Production / Preview / Development):
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 
-Use the same values from your Supabase Cloud project.  
 **Do not** set `SUPABASE_SERVICE_ROLE_KEY` or legacy `VITE_API_URL` on Vercel.
 
-SPA routing is configured in `vercel.json` (excludes `/downloads/*` so Print Bridge zip/manifest stay static).  
-Official ops Baseline: [docs/release-operational-v1.1.md](./docs/release-operational-v1.1.md) (`v1.1.0-production`).
+Build is defined in `vercel.json` (`pnpm install --frozen-lockfile` · `pnpm build` · `dist`). SPA rewrites exclude `/downloads/*` so Print Bridge zip/manifest stay static.
+
+> Legacy project `niha` (niha-omega.vercel.app) is **archive only** — not the production host.
 
 ## CI
 

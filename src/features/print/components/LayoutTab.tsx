@@ -16,30 +16,39 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
+import { GripVertical, Plus, Settings2, Trash2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
+import { AddElementDialog } from '@/features/print/components/designer/AddElementDialog'
+import {
+  ElementSettingsDialog,
+  type ElementSelection,
+} from '@/features/print/components/designer/ElementSettingsDialog'
 import { ThermalReceiptPreview } from '@/features/print/components/ThermalReceiptPreview'
-import { useUpsertPrintDocumentLayout, useEnqueueLayoutPreviewPrint } from '@/features/print/hooks/usePrintMutations'
+import {
+  useEnqueueLayoutPreviewPrint,
+  useUpsertPrintDocumentLayout,
+} from '@/features/print/hooks/usePrintMutations'
 import { printKeys } from '@/features/print/hooks/print.keys'
 import {
   usePrintDocumentLayout,
   usePrintSettings,
 } from '@/features/print/hooks/usePrintQueries'
 import {
+  catalogItemKey,
+  getPrintDesignerCatalog,
+  type DesignerCatalogItem,
+} from '@/features/print/layout/designer-catalog'
+import {
   defaultLayoutFor,
   mergeLayout,
   PRINT_DOCUMENT_TYPES,
-  SECTION_ALIGNS,
   sectionsForDocumentType,
   type DocumentLayout,
   type FieldStyle,
   type PrintDocumentType,
-  type SectionAlign,
-  type SectionDef,
   type SectionStyle,
 } from '@/features/print/layout/sections'
-import { REFERENCE_FIELD_IDS } from '@/features/print/layout/field-text'
 import {
   buildScenarioSnapshot,
   defaultScenarioId,
@@ -53,75 +62,32 @@ import {
   CardHeader,
   CardTitle,
 } from '@/shared/components/ui/card'
-import { Input } from '@/shared/components/ui/input'
-import { Label } from '@/shared/components/ui/label'
 import { ErrorState } from '@/shared/components/patterns/ErrorState'
 import { LoadingState } from '@/shared/components/patterns/LoadingState'
 import { cn } from '@/shared/utils/cn'
 import { t } from '@/shared/i18n'
 
-function styleControls(
-  style: { font_pt: number; align: SectionAlign; bold: boolean },
-  onChange: (patch: Partial<FieldStyle & SectionStyle>) => void,
-) {
-  return (
-    <>
-      <div className="space-y-1">
-        <Label>{t.print.layout.fontPt}</Label>
-        <Input
-          type="number"
-          min={10}
-          max={40}
-          value={style.font_pt}
-          onChange={(e) =>
-            onChange({ font_pt: Number(e.target.value) || style.font_pt })
-          }
-        />
-      </div>
-      <div className="space-y-1">
-        <Label>{t.print.layout.align}</Label>
-        <select
-          className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
-          value={style.align}
-          onChange={(e) => onChange({ align: e.target.value as SectionAlign })}
-        >
-          {SECTION_ALIGNS.map((a) => (
-            <option key={a} value={a}>
-              {t.print.layout.aligns[a]}
-            </option>
-          ))}
-        </select>
-      </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={style.bold}
-          onChange={(e) => onChange({ bold: e.target.checked })}
-        />
-        {t.print.layout.bold}
-      </label>
-    </>
-  )
+type DocElement = {
+  sectionId: string
+  fieldId: string
+  fieldLabel: string
+  sectionLabel: string
 }
 
-function SortableSectionCard({
-  def,
-  style,
-  open,
-  onToggle,
-  onPatchSection,
-  onPatchField,
-  labels,
-  fieldLabels,
+function SortableSectionBlock({
+  sectionId,
+  sectionLabel,
+  elements,
+  selectedKey,
+  onSelect,
+  onRemoveField,
 }: {
-  def: SectionDef
-  style: SectionStyle
-  open: boolean
-  onToggle: () => void
-  onPatchSection: (patch: Partial<SectionStyle>) => void
-  onPatchField: (fieldId: string, patch: Partial<FieldStyle>) => void
-  labels: Record<string, string>
-  fieldLabels: Record<string, string>
+  sectionId: string
+  sectionLabel: string
+  elements: DocElement[]
+  selectedKey: string | null
+  onSelect: (el: DocElement) => void
+  onRemoveField: (sectionId: string, fieldId: string) => void
 }) {
   const {
     attributes,
@@ -130,279 +96,90 @@ function SortableSectionCard({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: def.id })
-
-  const dragStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  }
+  } = useSortable({ id: sectionId })
 
   return (
     <div
       ref={setNodeRef}
-      style={dragStyle}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
       className={cn(
-        'border-border bg-card rounded-lg border shadow-sm',
+        'border-border bg-card rounded-lg border',
         isDragging && 'border-primary z-10 opacity-95 shadow-md',
       )}
     >
-      <div className="flex items-stretch gap-1">
+      <div className="flex items-center gap-1 border-b px-1 py-2">
         <button
           type="button"
-          className="text-muted-foreground hover:bg-muted/60 flex cursor-grab items-center px-2 active:cursor-grabbing"
+          className="text-muted-foreground hover:bg-muted/60 flex cursor-grab items-center px-2 py-1 active:cursor-grabbing"
           aria-label={t.print.layout.dragHandle}
           {...attributes}
           {...listeners}
         >
           <GripVertical className="size-4" />
         </button>
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center justify-between gap-2 px-2 py-3 text-start"
-          onClick={onToggle}
-        >
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">
-              {labels[def.labelKey] ?? def.id}
-            </p>
-            <p className="text-muted-foreground text-xs">
-              {style.visible ? t.print.layout.visible : t.print.layout.hidden}
-              {' · '}
-              {style.font_pt}pt
-              {' · '}
-              {t.print.layout.aligns[style.align]}
-              {' · '}
-              {def.fields.length} {t.print.layout.fieldsCount}
-            </p>
-          </div>
-          <span className="text-muted-foreground text-xs">{open ? '▾' : '◂'}</span>
-        </button>
+        <p className="min-w-0 flex-1 truncate text-sm font-semibold">
+          {sectionLabel}
+        </p>
+        <span className="text-muted-foreground pe-2 text-xs">
+          {elements.length}
+        </span>
       </div>
-
-      {open ? (
-        <div className="border-border space-y-4 border-t p-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <label className="flex items-center gap-2 text-sm sm:col-span-2">
-              <input
-                type="checkbox"
-                checked={style.visible}
-                onChange={(e) => onPatchSection({ visible: e.target.checked })}
-              />
-              {t.print.layout.sectionVisible}
-            </label>
-            {styleControls(style, onPatchSection)}
-            <div className="space-y-1">
-              <Label>{t.print.layout.spaceBefore}</Label>
-              <Input
-                type="number"
-                min={0}
-                max={12}
-                value={style.space_before}
-                onChange={(e) =>
-                  onPatchSection({ space_before: Number(e.target.value) || 0 })
-                }
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{t.print.layout.spaceAfter}</Label>
-              <Input
-                type="number"
-                min={0}
-                max={12}
-                value={style.space_after}
-                onChange={(e) =>
-                  onPatchSection({ space_after: Number(e.target.value) || 0 })
-                }
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <p className="text-sm font-medium">{t.print.layout.fieldsHeading}</p>
-            {def.fields.map((fd) => {
-              const field =
-                style.fields[fd.id] ??
-                ({
-                  visible: true,
-                  font_pt: style.font_pt,
-                  align: style.align,
-                  bold: style.bold,
-                } satisfies FieldStyle)
-              return (
-                <div
-                  key={fd.id}
-                  className="bg-muted/40 space-y-2 rounded-md border p-2"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium">
-                      {fieldLabels[fd.labelKey] ?? fd.id}
-                    </span>
-                    <label className="flex items-center gap-2 text-xs">
-                      <input
-                        type="checkbox"
-                        checked={field.visible}
-                        onChange={(e) =>
-                          onPatchField(fd.id, { visible: e.target.checked })
-                        }
-                      />
-                      {t.print.layout.visible}
-                    </label>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    {styleControls(field, (patch) => onPatchField(fd.id, patch))}
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label>{t.print.layout.fieldLabelAr}</Label>
-                      <Input
-                        className="h-9"
-                        placeholder={fieldLabels[fd.labelKey] ?? fd.id}
-                        value={field.label_ar ?? ''}
-                        onChange={(e) =>
-                          onPatchField(fd.id, {
-                            label_ar: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>{t.print.layout.fieldLabelEn}</Label>
-                      <Input
-                        className="h-9"
-                        placeholder="Invoice"
-                        dir="ltr"
-                        value={field.label_en ?? ''}
-                        onChange={(e) =>
-                          onPatchField(fd.id, {
-                            label_en: e.target.value,
-                          })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label>{t.print.layout.labelMode}</Label>
-                      <select
-                        className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
-                        value={field.label_mode ?? 'ar'}
-                        onChange={(e) =>
-                          onPatchField(fd.id, {
-                            label_mode: e.target
-                              .value as FieldStyle['label_mode'],
-                          })
-                        }
-                      >
-                        <option value="ar">{t.print.layout.labelModes.ar}</option>
-                        <option value="en">{t.print.layout.labelModes.en}</option>
-                        <option value="both">
-                          {t.print.layout.labelModes.both}
-                        </option>
-                        <option value="none">
-                          {t.print.layout.labelModes.none}
-                        </option>
-                      </select>
-                    </div>
-                    {REFERENCE_FIELD_IDS.has(fd.id) ? (
-                      <div className="space-y-1">
-                        <Label>{t.print.layout.valueFormat}</Label>
-                        <select
-                          className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm"
-                          value={field.value_format ?? 'default'}
-                          onChange={(e) =>
-                            onPatchField(fd.id, {
-                              value_format: e.target
-                                .value as FieldStyle['value_format'],
-                            })
-                          }
-                        >
-                          <option value="default">
-                            {t.print.layout.valueFormats.default}
-                          </option>
-                          <option value="number_only">
-                            {t.print.layout.valueFormats.number_only}
-                          </option>
-                        </select>
-                      </div>
-                    ) : null}
-                  </div>
-                  <p className="text-muted-foreground text-[11px]">
-                    {t.print.layout.fieldLabelHint}
-                  </p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
+      <ul className="divide-border divide-y">
+        {elements.map((el) => {
+          const key = catalogItemKey(el.sectionId, el.fieldId)
+          const selected = selectedKey === key
+          return (
+            <li key={key} className="flex items-stretch">
+              <button
+                type="button"
+                className={cn(
+                  'hover:bg-muted/40 flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-start text-sm',
+                  selected && 'bg-muted/60',
+                )}
+                onClick={() => onSelect(el)}
+              >
+                <span className="min-w-0 flex-1 truncate">{el.fieldLabel}</span>
+                <Settings2 className="text-muted-foreground size-3.5 shrink-0" />
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground hover:bg-muted/60 hover:text-destructive px-2"
+                aria-label={t.print.layout.removeFromDocument}
+                onClick={() => onRemoveField(el.sectionId, el.fieldId)}
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            </li>
+          )
+        })}
+      </ul>
     </div>
   )
 }
 
 export function LayoutTab() {
-  const queryClient = useQueryClient()
   const [docType, setDocType] = useState<PrintDocumentType>('receipt')
-  const [scenarioId, setScenarioId] = useState<PreviewScenarioId>(
+  const [scenarioId, setScenarioId] = useState<PreviewScenarioId>(() =>
     defaultScenarioId('receipt'),
   )
-  const [openId, setOpenId] = useState<string | null>('restaurant_name')
+  const [draft, setDraft] = useState<DocumentLayout>(() =>
+    defaultLayoutFor('receipt'),
+  )
+  const [addOpen, setAddOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [selection, setSelection] = useState<ElementSelection | null>(null)
+
+  const dirtyRef = useRef(false)
+  const loadedForTypeRef = useRef<PrintDocumentType | null>(null)
+
   const layoutQuery = usePrintDocumentLayout(docType)
   const settingsQuery = usePrintSettings()
   const save = useUpsertPrintDocumentLayout()
   const testPrint = useEnqueueLayoutPreviewPrint()
-
-  const [draft, setDraft] = useState<DocumentLayout>(() =>
-    defaultLayoutFor('receipt'),
-  )
-  const dirtyRef = useRef(false)
-  const loadedForTypeRef = useRef<string | null>(null)
-
-  useEffect(() => {
-    dirtyRef.current = false
-    loadedForTypeRef.current = null
-  }, [docType])
-
-  useEffect(() => {
-    // Don't clobber in-progress edits when a background refetch arrives.
-    if (dirtyRef.current && loadedForTypeRef.current === docType) return
-
-    if (!layoutQuery.data?.layout) {
-      if (!layoutQuery.isLoading && !layoutQuery.isFetching) {
-        setDraft(defaultLayoutFor(docType))
-        loadedForTypeRef.current = docType
-      }
-      return
-    }
-    setDraft(mergeLayout(docType, layoutQuery.data.layout))
-    loadedForTypeRef.current = docType
-    dirtyRef.current = false
-  }, [
-    docType,
-    layoutQuery.data,
-    layoutQuery.dataUpdatedAt,
-    layoutQuery.isLoading,
-    layoutQuery.isFetching,
-  ])
-
-  useEffect(() => {
-    setScenarioId(defaultScenarioId(docType))
-    setOpenId(null)
-  }, [docType])
-
-  const snapshot = useMemo(() => {
-    const settings = settingsQuery.data
-    return buildScenarioSnapshot(scenarioId, {
-      restaurant_name: undefined,
-      slogan: settings?.receipt_slogan,
-      restaurant_phone: settings?.restaurant_phone,
-      restaurant_address: settings?.restaurant_address,
-      thank_you: settings?.thank_you_message,
-      show_qr: settings?.show_qr_on_receipt ?? true,
-    })
-  }, [scenarioId, settingsQuery.data])
-
-  const sectionDefs = sectionsForDocumentType(docType)
-  const orderedDefs = draft.section_order
-    .map((id) => sectionDefs.find((d) => d.id === id))
-    .filter((d): d is SectionDef => Boolean(d))
+  const queryClient = useQueryClient()
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -411,60 +188,90 @@ export function LayoutTab() {
     }),
   )
 
-  function markDirty() {
+  useEffect(() => {
+    setScenarioId(defaultScenarioId(docType))
+  }, [docType])
+
+  useEffect(() => {
+    if (!layoutQuery.data?.layout) return
+    if (dirtyRef.current && loadedForTypeRef.current === docType) return
+    const next = mergeLayout(docType, layoutQuery.data.layout)
+    setDraft(next)
+    dirtyRef.current = false
+    loadedForTypeRef.current = docType
+  }, [layoutQuery.data, docType])
+
+  const sectionLabels = t.print.layout.sections as Record<string, string>
+  const fieldLabels = t.print.layout.fields as Record<string, string>
+  const scenarioLabels = t.print.layout.scenarios as Record<string, string>
+  const catalog = useMemo(() => getPrintDesignerCatalog(docType), [docType])
+  const defs = useMemo(() => sectionsForDocumentType(docType), [docType])
+
+  const branding = useMemo(() => {
+    const ps = settingsQuery.data
+    return {
+      restaurant_name: undefined as string | undefined,
+      slogan: ps?.receipt_slogan,
+      restaurant_phone: ps?.restaurant_phone,
+      restaurant_address: ps?.restaurant_address,
+      thank_you: ps?.thank_you_message,
+      show_qr: ps?.show_qr_on_receipt,
+    }
+  }, [settingsQuery.data])
+
+  const snapshot = useMemo(
+    () => buildScenarioSnapshot(scenarioId, branding),
+    [scenarioId, branding],
+  )
+
+  const documentElements = useMemo(() => {
+    const bySection = new Map<string, DocElement[]>()
+    for (const sectionId of draft.section_order) {
+      const sec = draft.sections[sectionId]
+      const def = defs.find((d) => d.id === sectionId)
+      if (!sec?.visible || !def) continue
+      const els: DocElement[] = []
+      for (const fd of def.fields) {
+        const f = sec.fields[fd.id]
+        if (!f?.visible) continue
+        els.push({
+          sectionId,
+          fieldId: fd.id,
+          fieldLabel: fieldLabels[fd.labelKey] ?? fd.id,
+          sectionLabel: sectionLabels[def.labelKey] ?? sectionId,
+        })
+      }
+      if (els.length > 0) bySection.set(sectionId, els)
+    }
+    return bySection
+  }, [draft, defs, fieldLabels, sectionLabels])
+
+  const sortableSectionIds = useMemo(
+    () => [...documentElements.keys()],
+    [documentElements],
+  )
+
+  const onDocumentKeys = useMemo(() => {
+    const keys = new Set<string>()
+    for (const els of documentElements.values()) {
+      for (const el of els) keys.add(catalogItemKey(el.sectionId, el.fieldId))
+    }
+    return keys
+  }, [documentElements])
+
+  const selectedField: FieldStyle | null = selection
+    ? (draft.sections[selection.sectionId]?.fields[selection.fieldId] ?? null)
+    : null
+  const selectedSection: SectionStyle | null = selection
+    ? (draft.sections[selection.sectionId] ?? null)
+    : null
+  const selectedKey = selection
+    ? catalogItemKey(selection.sectionId, selection.fieldId)
+    : null
+
+  function markDirty(next: DocumentLayout) {
+    setDraft(next)
     dirtyRef.current = true
-  }
-
-  function onDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
-    markDirty()
-    setDraft((prev) => {
-      const oldIndex = prev.section_order.indexOf(String(active.id))
-      const newIndex = prev.section_order.indexOf(String(over.id))
-      if (oldIndex < 0 || newIndex < 0) return prev
-      return {
-        ...prev,
-        section_order: arrayMove(prev.section_order, oldIndex, newIndex),
-      }
-    })
-  }
-
-  function patchSection(id: string, patch: Partial<SectionStyle>) {
-    markDirty()
-    setDraft((prev) => {
-      const cur = prev.sections[id] ?? defaultLayoutFor(docType).sections[id]!
-      const next: SectionStyle = {
-        ...cur,
-        ...patch,
-        fields: patch.fields ?? cur.fields,
-      }
-      const cascaded = (['font_pt', 'align', 'bold'] as const).some(
-        (k) => k in patch && patch[k] !== undefined,
-      )
-      if (cascaded && !patch.fields) {
-        const fields: Record<string, FieldStyle> = {}
-        for (const [fid, field] of Object.entries(cur.fields)) {
-          fields[fid] = {
-            ...field,
-            font_pt:
-              typeof patch.font_pt === 'number' ? patch.font_pt : field.font_pt,
-            align:
-              patch.align === 'right' ||
-              patch.align === 'center' ||
-              patch.align === 'left'
-                ? patch.align
-                : field.align,
-            bold: typeof patch.bold === 'boolean' ? patch.bold : field.bold,
-          }
-        }
-        next.fields = fields
-      }
-      return {
-        ...prev,
-        sections: { ...prev.sections, [id]: next },
-      }
-    })
   }
 
   function patchField(
@@ -472,30 +279,65 @@ export function LayoutTab() {
     fieldId: string,
     patch: Partial<FieldStyle>,
   ) {
-    markDirty()
-    setDraft((prev) => {
-      const cur =
-        prev.sections[sectionId] ??
-        defaultLayoutFor(docType).sections[sectionId]!
-      const field = cur.fields[fieldId] ?? {
-        visible: true,
-        font_pt: cur.font_pt,
-        align: cur.align,
-        bold: cur.bold,
-      }
-      return {
-        ...prev,
-        sections: {
-          ...prev.sections,
-          [sectionId]: {
-            ...cur,
-            fields: {
-              ...cur.fields,
-              [fieldId]: { ...field, ...patch },
-            },
+    const sec = draft.sections[sectionId]
+    if (!sec) return
+    const field = sec.fields[fieldId]
+    if (!field) return
+    markDirty({
+      ...draft,
+      sections: {
+        ...draft.sections,
+        [sectionId]: {
+          ...sec,
+          visible: patch.visible === false ? sec.visible : true,
+          fields: {
+            ...sec.fields,
+            [fieldId]: { ...field, ...patch },
           },
         },
+      },
+    })
+  }
+
+  function addItems(items: DesignerCatalogItem[]) {
+    const sections = { ...draft.sections }
+    for (const it of items) {
+      const sec = sections[it.sectionId]
+      const field = sec?.fields[it.fieldId]
+      if (!sec || !field) continue
+      sections[it.sectionId] = {
+        ...sec,
+        visible: true,
+        fields: {
+          ...sec.fields,
+          [it.fieldId]: { ...field, visible: true },
+        },
       }
+    }
+    markDirty({ ...draft, sections })
+    toast.success(t.print.layout.elementsAdded)
+  }
+
+  function removeField(sectionId: string, fieldId: string) {
+    patchField(sectionId, fieldId, { visible: false })
+    if (
+      selection?.sectionId === sectionId &&
+      selection.fieldId === fieldId
+    ) {
+      setSettingsOpen(false)
+      setSelection(null)
+    }
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = draft.section_order.indexOf(String(active.id))
+    const newIndex = draft.section_order.indexOf(String(over.id))
+    if (oldIndex < 0 || newIndex < 0) return
+    markDirty({
+      ...draft,
+      section_order: arrayMove(draft.section_order, oldIndex, newIndex),
     })
   }
 
@@ -519,9 +361,9 @@ export function LayoutTab() {
     )
   }
 
-  function runTestPrint() {
+  function runTestPrint(layout: DocumentLayout) {
     testPrint.mutate(
-      { documentType: docType, layout: draft, snapshot },
+      { documentType: docType, layout, snapshot },
       {
         onSuccess: () => toast.success(t.print.layout.testQueued),
         onError: (e: Error) => toast.error(e.message),
@@ -546,20 +388,14 @@ export function LayoutTab() {
               layout: next,
             })
             toast.success(t.print.layout.saved)
-            testPrint.mutate(
-              { documentType: docType, layout: next, snapshot },
-              {
-                onSuccess: () => toast.success(t.print.layout.testQueued),
-                onError: (e: Error) => toast.error(e.message),
-              },
-            )
+            runTestPrint(next)
           },
           onError: (e: Error) => toast.error(e.message),
         },
       )
       return
     }
-    runTestPrint()
+    runTestPrint(draft)
   }
 
   if (layoutQuery.isLoading || settingsQuery.isLoading) {
@@ -585,9 +421,6 @@ export function LayoutTab() {
     )
   }
 
-  const labels = t.print.layout.sections as Record<string, string>
-  const fieldLabels = t.print.layout.fields as Record<string, string>
-  const scenarioLabels = t.print.layout.scenarios as Record<string, string>
   const scenarios = scenariosForDocumentType(docType)
 
   return (
@@ -597,28 +430,41 @@ export function LayoutTab() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <CardTitle>{t.print.layout.heading}</CardTitle>
-              <p className="text-muted-foreground mt-1 max-w-2xl text-sm">
-                {t.print.layout.hint}
-              </p>
-              <p className="text-muted-foreground mt-1 text-xs">
-                {t.print.layout.reorderHint}
+              <p className="text-muted-foreground mt-1 text-sm">
+                {t.print.layout.hintClean}
               </p>
             </div>
-            <Button type="button" onClick={onSave} loading={save.isPending}>
-              {t.print.common.save}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onTestPrint}
+                loading={testPrint.isPending}
+              >
+                {t.print.layout.testPrint}
+              </Button>
+              <Button
+                type="button"
+                onClick={onSave}
+                loading={save.isPending}
+              >
+                {t.common.save}
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-3">
-            <div className="space-y-1">
-              <Label htmlFor="doc-type">{t.print.layout.documentType}</Label>
+            <label className="space-y-1 text-sm">
+              <span className="text-muted-foreground">
+                {t.print.layout.documentType}
+              </span>
               <select
-                id="doc-type"
                 className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 value={docType}
-                onChange={(e) =>
+                onChange={(e) => {
+                  dirtyRef.current = false
                   setDocType(e.target.value as PrintDocumentType)
-                }
+                }}
               >
                 {PRINT_DOCUMENT_TYPES.map((d) => (
                   <option key={d} value={d}>
@@ -626,11 +472,30 @@ export function LayoutTab() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="scenario">{t.print.layout.scenario}</Label>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-muted-foreground">
+                {t.print.layout.paperWidth}
+              </span>
               <select
-                id="scenario"
+                className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
+                value={draft.paper_width_mm}
+                onChange={(e) =>
+                  markDirty({
+                    ...draft,
+                    paper_width_mm: Number(e.target.value) as 58 | 80,
+                  })
+                }
+              >
+                <option value={58}>58</option>
+                <option value={80}>80</option>
+              </select>
+            </label>
+            <label className="space-y-1 text-sm">
+              <span className="text-muted-foreground">
+                {t.print.layout.scenario}
+              </span>
+              <select
                 className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 value={scenarioId}
                 onChange={(e) =>
@@ -643,81 +508,77 @@ export function LayoutTab() {
                   </option>
                 ))}
               </select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="paper-w">{t.print.layout.paperWidth}</Label>
-              <select
-                id="paper-w"
-                className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
-                value={draft.paper_width_mm}
-                onChange={(e) => {
-                  dirtyRef.current = true
-                  setDraft((p) => ({
-                    ...p,
-                    paper_width_mm: Number(e.target.value) === 58 ? 58 : 80,
-                  }))
-                }}
-              >
-                <option value={80}>80</option>
-                <option value={58}>58</option>
-              </select>
-            </div>
+            </label>
           </div>
-          <p className="text-muted-foreground text-xs">
-            {scenarioLabels[
-              scenarios.find((s) => s.id === scenarioId)?.descriptionKey ?? ''
-            ] ?? t.print.layout.scenarioHint}
-          </p>
         </CardHeader>
       </Card>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <h3 className="text-sm font-semibold">
-              {t.print.layout.sectionsHeading}
-            </h3>
+      <div className="grid gap-4 xl:grid-cols-[minmax(280px,360px)_1fr]">
+        <Card>
+          <CardHeader className="gap-2 pb-2">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-base">
+                {t.print.layout.documentElements}
+              </CardTitle>
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => setAddOpen(true)}
+              >
+                <Plus className="size-4" />
+                {t.print.layout.addElement}
+              </Button>
+            </div>
             <p className="text-muted-foreground text-xs">
-              {t.print.layout.dragHint}
+              {t.print.layout.documentElementsHint}
             </p>
-          </div>
-
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={onDragEnd}
-          >
-            <SortableContext
-              items={orderedDefs.map((d) => d.id)}
-              strategy={verticalListSortingStrategy}
-            >
-              <div className="space-y-2">
-                {orderedDefs.map((def) => {
-                  const style =
-                    draft.sections[def.id] ??
-                    defaultLayoutFor(docType).sections[def.id]!
-                  return (
-                    <SortableSectionCard
-                      key={def.id}
-                      def={def}
-                      style={style}
-                      open={openId === def.id}
-                      onToggle={() =>
-                        setOpenId((cur) => (cur === def.id ? null : def.id))
-                      }
-                      onPatchSection={(patch) => patchSection(def.id, patch)}
-                      onPatchField={(fieldId, patch) =>
-                        patchField(def.id, fieldId, patch)
-                      }
-                      labels={labels}
-                      fieldLabels={fieldLabels}
-                    />
-                  )
-                })}
-              </div>
-            </SortableContext>
-          </DndContext>
-        </div>
+          </CardHeader>
+          <CardContent className="space-y-2 pb-4">
+            {sortableSectionIds.length === 0 ? (
+              <p className="text-muted-foreground rounded-lg border border-dashed px-3 py-8 text-center text-sm">
+                {t.print.layout.emptyDocument}
+              </p>
+            ) : (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={onDragEnd}
+              >
+                <SortableContext
+                  items={sortableSectionIds}
+                  strategy={verticalListSortingStrategy}
+                >
+                  <div className="space-y-2">
+                    {sortableSectionIds.map((sectionId) => {
+                      const els = documentElements.get(sectionId) ?? []
+                      return (
+                        <SortableSectionBlock
+                          key={sectionId}
+                          sectionId={sectionId}
+                          sectionLabel={
+                            els[0]?.sectionLabel ?? sectionId
+                          }
+                          elements={els}
+                          selectedKey={selectedKey}
+                          onSelect={(el) => {
+                            setSelection({
+                              sectionId: el.sectionId,
+                              fieldId: el.fieldId,
+                              fieldLabel: el.fieldLabel,
+                              sectionLabel: el.sectionLabel,
+                            })
+                            setSettingsOpen(true)
+                          }}
+                          onRemoveField={removeField}
+                        />
+                      )
+                    })}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            )}
+          </CardContent>
+        </Card>
 
         <Card className="h-fit xl:sticky xl:top-4">
           <CardHeader className="gap-1 pb-2">
@@ -728,29 +589,63 @@ export function LayoutTab() {
               {t.print.layout.livePreviewHint}
             </p>
           </CardHeader>
-          <CardContent className="flex flex-col items-center gap-3 overflow-x-auto pb-6">
+          <CardContent className="flex flex-col items-center overflow-x-auto pb-6">
             <ThermalReceiptPreview
               documentType={docType}
               layout={draft}
               snapshot={snapshot}
             />
-            <div className="flex w-full flex-col items-center gap-1.5 px-1">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full"
-                onClick={onTestPrint}
-                loading={testPrint.isPending}
-              >
-                {t.print.layout.testPrint}
-              </Button>
-              <p className="text-muted-foreground text-center text-xs">
-                {t.print.layout.testPrintHint}
-              </p>
-            </div>
           </CardContent>
         </Card>
       </div>
+
+      <AddElementDialog
+        open={addOpen}
+        onOpenChange={setAddOpen}
+        groups={catalog}
+        onDocumentKeys={onDocumentKeys}
+        onAdd={addItems}
+      />
+
+      <ElementSettingsDialog
+        open={settingsOpen}
+        selection={selection}
+        field={selectedField}
+        section={selectedSection}
+        onOpenChange={(v) => {
+          setSettingsOpen(v)
+          if (!v) setSelection(null)
+        }}
+        onSave={({ field, section }) => {
+          if (!selection) return
+          const sec = draft.sections[selection.sectionId]
+          const curField = sec?.fields[selection.fieldId]
+          if (!sec || !curField) return
+          markDirty({
+            ...draft,
+            sections: {
+              ...draft.sections,
+              [selection.sectionId]: {
+                ...sec,
+                ...(section ?? {}),
+                visible: true,
+                fields: {
+                  ...sec.fields,
+                  [selection.fieldId]: { ...curField, ...field },
+                },
+              },
+            },
+          })
+          setSettingsOpen(false)
+          setSelection(null)
+          toast.success(t.print.layout.elementSaved)
+        }}
+        onRemove={() => {
+          if (!selection) return
+          removeField(selection.sectionId, selection.fieldId)
+          toast.success(t.print.layout.elementRemoved)
+        }}
+      />
     </div>
   )
 }

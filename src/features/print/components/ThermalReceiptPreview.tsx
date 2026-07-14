@@ -213,27 +213,19 @@ export function ThermalReceiptPreview({
                 rawValue={str(snapshot, 'order_reference')}
               />
             ) : (
-              <FieldLine
-                section={s}
-                fieldId="invoice_number"
-                rawValue={str(snapshot, 'order_reference')}
-              />
+              <>
+                <FieldLine
+                  section={s}
+                  fieldId="invoice_number"
+                  rawValue={str(snapshot, 'order_reference')}
+                />
+                <FieldLine
+                  section={s}
+                  fieldId="order_reference"
+                  rawValue={str(snapshot, 'order_reference')}
+                />
+              </>
             )}
-            <FieldLine
-              section={s}
-              fieldId="datetime"
-              rawValue={str(snapshot, 'datetime')}
-            />
-            <FieldLine
-              section={s}
-              fieldId="cashier"
-              rawValue={str(snapshot, 'cashier')}
-            />
-            <FieldLine
-              section={s}
-              fieldId="order_type"
-              rawValue={str(snapshot, 'order_type_ar')}
-            />
             {isKitchen ? (
               <FieldLine
                 section={s}
@@ -241,6 +233,58 @@ export function ThermalReceiptPreview({
                 rawValue={str(snapshot, 'kitchen_ticket')}
               />
             ) : null}
+            <FieldLine
+              section={s}
+              fieldId="order_type"
+              rawValue={str(snapshot, 'order_type_ar')}
+            />
+            <FieldLine
+              section={s}
+              fieldId="created_by_name"
+              rawValue={
+                str(snapshot, 'created_by_name') ?? str(snapshot, 'cashier')
+              }
+            />
+            {!isKitchen ? (
+              <>
+                <FieldLine
+                  section={s}
+                  fieldId="last_edited_by_name"
+                  rawValue={str(snapshot, 'last_edited_by_name')}
+                />
+                <FieldLine
+                  section={s}
+                  fieldId="collected_by_name"
+                  rawValue={str(snapshot, 'collected_by_name')}
+                />
+              </>
+            ) : null}
+            <FieldLine
+              section={s}
+              fieldId="created_at"
+              rawValue={str(snapshot, 'created_at')}
+            />
+            {!isKitchen ? (
+              <>
+                <FieldLine
+                  section={s}
+                  fieldId="last_edited_at"
+                  rawValue={str(snapshot, 'last_edited_at')}
+                />
+                <FieldLine
+                  section={s}
+                  fieldId="collected_at"
+                  rawValue={str(snapshot, 'collected_at')}
+                />
+              </>
+            ) : null}
+            <FieldLine
+              section={s}
+              fieldId="printed_at"
+              rawValue={
+                str(snapshot, 'printed_at') ?? str(snapshot, 'datetime')
+              }
+            />
           </SectionBox>
         )
       }
@@ -258,20 +302,55 @@ export function ThermalReceiptPreview({
               fieldId="customer_name"
               rawValue={str(snapshot, 'customer_name')}
             />
+            <FieldLine
+              section={s}
+              fieldId="customer_phone"
+              rawValue={str(snapshot, 'customer_phone')}
+            />
+            <FieldLine
+              section={s}
+              fieldId="delivery_zone"
+              rawValue={str(snapshot, 'delivery_zone')}
+            />
+            <FieldLine
+              section={s}
+              fieldId="delivery_address"
+              rawValue={str(snapshot, 'delivery_address')}
+            />
             {!isKitchen ? (
-              <>
-                <FieldLine
-                  section={s}
-                  fieldId="customer_phone"
-                  rawValue={str(snapshot, 'customer_phone')}
-                />
-                <FieldLine
-                  section={s}
-                  fieldId="delivery_address"
-                  rawValue={str(snapshot, 'delivery_address')}
-                />
-              </>
+              <FieldLine
+                section={s}
+                fieldId="delivery_notes"
+                rawValue={str(snapshot, 'delivery_notes')}
+              />
             ) : null}
+            <FieldLine
+              section={s}
+              fieldId="driver_name"
+              rawValue={str(snapshot, 'driver_name')}
+            />
+          </SectionBox>
+        )
+      case 'ops':
+        return (
+          <SectionBox section={s}>
+            <FieldLine
+              section={s}
+              fieldId="shift_reference"
+              rawValue={str(snapshot, 'shift_reference')}
+            />
+            <FieldLine
+              section={s}
+              fieldId="branch_name"
+              rawValue={
+                str(snapshot, 'branch_name') ?? str(snapshot, 'restaurant_name')
+              }
+            />
+            <FieldLine
+              section={s}
+              fieldId="device_name"
+              rawValue={str(snapshot, 'device_name')}
+            />
           </SectionBox>
         )
       case 'lines': {
@@ -439,9 +518,11 @@ export function ThermalReceiptPreview({
         )
       }
       case 'payment': {
+        const linesF = fieldStyle(s, 'payment_lines')
         const methodF = fieldStyle(s, 'method')
         const statusF = fieldStyle(s, 'status')
         const changeF = fieldStyle(s, 'change')
+        const payments = Array.isArray(snapshot.payments) ? snapshot.payments : []
         const method = str(snapshot, 'payment_method')
         const status = str(snapshot, 'payment_status_ar')
         const change =
@@ -450,8 +531,37 @@ export function ThermalReceiptPreview({
             : Number(snapshot.change_total ?? 0)
         const methodLine = methodF ? fieldPrintText(methodF, method) : null
         const statusLine = statusF ? fieldPrintText(statusF, status) : null
+        const header = fieldLabelOnly(linesF)
         return (
           <SectionBox section={s}>
+            {linesF && payments.length > 0 ? (
+              <div className="mb-2 space-y-1">
+                {header ? (
+                  <div
+                    className={cn(alignClass(linesF.align), linesF.bold && 'font-bold')}
+                    style={{ fontSize: linesF.font_pt }}
+                  >
+                    {header}
+                  </div>
+                ) : null}
+                {payments.map((raw, i) => {
+                  const p = raw as { method?: string; amount?: number; net_amount?: number }
+                  const name = String(p.method ?? '').trim()
+                  if (!name) return null
+                  const amt = p.net_amount ?? p.amount
+                  return (
+                    <div
+                      key={i}
+                      className="flex justify-between gap-2"
+                      style={{ fontSize: linesF.font_pt }}
+                    >
+                      <span>{name}</span>
+                      <span>{money(amt, cur)}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : null}
             {(methodLine || statusLine) && (
               <div className="border-2 border-neutral-900 px-2 py-2">
                 <div className="flex justify-between gap-2">

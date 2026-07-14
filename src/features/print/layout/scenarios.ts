@@ -25,6 +25,7 @@ function brandingBase(branding?: {
 }) {
   return {
     restaurant_name: branding?.restaurant_name?.trim() || 'نيها يم',
+    branch_name: branding?.restaurant_name?.trim() || 'نيها يم',
     slogan:
       branding?.slogan?.trim() || 'من أول لقمة ... والباقي إدمان',
     restaurant_phone: branding?.restaurant_phone?.trim() || '01107666987',
@@ -34,8 +35,15 @@ function brandingBase(branding?: {
     thank_you: branding?.thank_you?.trim() || 'شكراً لزيارتكم',
     show_qr: branding?.show_qr ?? true,
     currency_label: branding?.currency_label?.trim() || 'ج.م',
-    datetime: '2026/07/11 12:05:33 م',
-    cashier: 'إبراهيم',
+    created_by_name: 'إبراهيم',
+    last_edited_by_name: 'سارة',
+    collected_by_name: 'أحمد',
+    created_at: '2026/07/13 11:40',
+    last_edited_at: '2026/07/13 11:55',
+    collected_at: '2026/07/13 12:05',
+    printed_at: '2026/07/13 12:06',
+    shift_reference: 'SH-000042',
+    device_name: 'كاشير-1',
   }
 }
 
@@ -52,6 +60,10 @@ export function buildScenarioSnapshot(
       order_type_ar: 'دليفري',
       table_ref: null,
       customer_name: 'محمود علي',
+      customer_phone: '01107666987',
+      delivery_zone: 'الكورنيش',
+      delivery_address: 'أسوان - الكورنيش - عمارة 14',
+      driver_name: 'كريم',
       kitchen_ticket: 'KT-000087',
       order_note: 'توصيل سريع — بدون بصل — اتصال قبل الوصول',
       lines: [
@@ -164,7 +176,10 @@ export function buildScenarioSnapshot(
     table_ref: null,
     customer_name: 'محمود علي حسن',
     customer_phone: '01107666987',
+    delivery_zone: 'الكورنيش',
     delivery_address: 'أسوان - الكورنيش - عمارة 14 - الدور 3 - شقة 8',
+    delivery_notes: 'الاتصال قبل الوصول — الجرس لا يعمل',
+    driver_name: 'كريم',
     payment_status_ar: 'مدفوع',
     payment_method: 'نقدي',
     lines: [
@@ -201,7 +216,11 @@ export function buildScenarioSnapshot(
     tax_amount: 0,
     total: 170,
     change_total: 30,
-    payments: [{ method: 'نقدي', amount: 200, net_amount: 170 }],
+    payments: [
+      { method: 'نقدي', amount: 120, net_amount: 120 },
+      { method: 'محفظة', amount: 50, net_amount: 50 },
+      { method: 'بطاقة', amount: 30, net_amount: 30 },
+    ],
   }
 }
 
