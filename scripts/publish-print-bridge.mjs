@@ -88,7 +88,7 @@ const defaults = {
   version,
   printCenterUrl: env.VITE_APP_ORIGIN
     ? `${String(env.VITE_APP_ORIGIN).replace(/\/$/, '')}/admin/print`
-    : '',
+    : 'https://niha-yam.vercel.app/admin/print',
 }
 writeFileSync(
   path.join(outDir, 'bridge-defaults.json'),

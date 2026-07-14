@@ -8,6 +8,7 @@ public sealed class MainForm : Form
     private readonly BridgeLogger _log;
     private readonly PrintWorker _worker;
     private readonly NotifyIcon _tray;
+    private readonly TrayApplicationContext _app;
 
     private readonly Label _linkStatus;
     private readonly Label _pairStatus;
@@ -21,19 +22,29 @@ public sealed class MainForm : Form
     private Label _advHeartbeat = null!;
     private readonly Button _advancedToggle;
     private bool _advancedOpen;
+    private CheckBox _chkAutostart = null!;
+    private CheckBox _chkAutoUpdate = null!;
+    private Label _updateStatus = null!;
+    private bool _settingsSyncing;
 
-    public MainForm(BridgeConfig cfg, BridgeLogger log, PrintWorker worker, NotifyIcon tray)
+    public MainForm(
+        BridgeConfig cfg,
+        BridgeLogger log,
+        PrintWorker worker,
+        NotifyIcon tray,
+        TrayApplicationContext app)
     {
         _cfg = cfg;
         _log = log;
         _worker = worker;
         _tray = tray;
+        _app = app;
 
         NihaTheme.ApplyForm(this);
         Text = Ar.AppTitle;
         Width = 520;
-        Height = 640;
-        MinimumSize = new Size(480, 560);
+        Height = 720;
+        MinimumSize = new Size(480, 620);
 
         try { Icon = NihaTheme.CreateAppIcon(); } catch { /* ignore */ }
 
@@ -115,6 +126,8 @@ public sealed class MainForm : Form
         lastCard.Controls.Add(_lastPrint);
         lastCard.Controls.Add(lastTitle);
 
+        var settingsCard = BuildSettingsCard();
+
         var actions = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
@@ -155,13 +168,11 @@ public sealed class MainForm : Form
         _advancedPanel.Visible = false;
         _advancedPanel.Height = 200;
 
-        // Dock order: last added is topmost among Top docks when added carefully —
-        // use a vertical TableLayout instead for clarity.
         var stack = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             ColumnCount = 1,
-            RowCount = 7,
+            RowCount = 8,
             AutoSize = true,
         };
         stack.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
@@ -169,9 +180,10 @@ public sealed class MainForm : Form
         stack.Controls.Add(adminHint, 0, 1);
         stack.Controls.Add(printersCard, 0, 2);
         stack.Controls.Add(lastCard, 0, 3);
-        stack.Controls.Add(actions, 0, 4);
-        stack.Controls.Add(_advancedToggle, 0, 5);
-        stack.Controls.Add(_advancedPanel, 0, 6);
+        stack.Controls.Add(settingsCard, 0, 4);
+        stack.Controls.Add(actions, 0, 5);
+        stack.Controls.Add(_advancedToggle, 0, 6);
+        stack.Controls.Add(_advancedPanel, 0, 7);
 
         root.Controls.Add(stack);
         Controls.Add(root);
@@ -193,6 +205,122 @@ public sealed class MainForm : Form
     }
 
     public event Action? RePairRequested;
+
+    public void SyncSettingsUi()
+    {
+        if (_chkAutostart is null || _chkAutoUpdate is null) return;
+        _settingsSyncing = true;
+        try
+        {
+            _chkAutostart.Checked = _cfg.StartWithWindows;
+            _chkAutoUpdate.Checked = _cfg.AutoUpdate;
+        }
+        finally
+        {
+            _settingsSyncing = false;
+        }
+    }
+
+    private Panel BuildSettingsCard()
+    {
+        var card = NihaTheme.Card();
+        card.Dock = DockStyle.Top;
+        card.Height = 150;
+        card.Padding = new Padding(16);
+        PaintBorder(card);
+
+        var title = new Label
+        {
+            Text = Ar.Settings,
+            Font = NihaTheme.UiFont(11f, FontStyle.Bold),
+            Dock = DockStyle.Top,
+            Height = 26,
+        };
+
+        _chkAutostart = new CheckBox
+        {
+            Text = Ar.StartWithWindows,
+            Checked = _cfg.StartWithWindows,
+            Dock = DockStyle.Top,
+            Height = 28,
+            Font = NihaTheme.UiFont(9.5f),
+            AutoSize = false,
+        };
+        _chkAutostart.CheckedChanged += (_, _) =>
+        {
+            if (_settingsSyncing) return;
+            _cfg.StartWithWindows = _chkAutostart.Checked;
+            _cfg.StartWithWindowsInitialized = true;
+            Autostart.SetEnabled(_cfg.StartWithWindows);
+            ConfigStore.Save(_cfg);
+        };
+
+        _chkAutoUpdate = new CheckBox
+        {
+            Text = Ar.AutoUpdate,
+            Checked = _cfg.AutoUpdate,
+            Dock = DockStyle.Top,
+            Height = 28,
+            Font = NihaTheme.UiFont(9.5f),
+            AutoSize = false,
+        };
+        _chkAutoUpdate.CheckedChanged += (_, _) =>
+        {
+            if (_settingsSyncing) return;
+            _cfg.AutoUpdate = _chkAutoUpdate.Checked;
+            ConfigStore.Save(_cfg);
+        };
+
+        var row = new FlowLayoutPanel
+        {
+            Dock = DockStyle.Top,
+            Height = 40,
+            FlowDirection = FlowDirection.RightToLeft,
+            WrapContents = false,
+        };
+        var checkBtn = NihaTheme.OutlineButton(Ar.CheckUpdate);
+        checkBtn.Width = 140;
+        checkBtn.Click += async (_, _) =>
+        {
+            checkBtn.Enabled = false;
+            _updateStatus.Text = "…";
+            try
+            {
+                await _app.RunUpdateCheckAsync(interactive: true);
+                var r = await BridgeUpdater.CheckAsync(_cfg);
+                if (!IsDisposed)
+                {
+                    _updateStatus.Text = r.Message;
+                    _updateStatus.ForeColor = r.UpdateAvailable ? NihaTheme.Primary : NihaTheme.Muted;
+                }
+            }
+            catch
+            {
+                // App may exit mid-update
+            }
+            finally
+            {
+                if (!IsDisposed) checkBtn.Enabled = true;
+            }
+        };
+        row.Controls.Add(checkBtn);
+
+        _updateStatus = new Label
+        {
+            Text = string.Format(Ar.UpdateUpToDateFmt, BridgeUpdater.CurrentVersion),
+            Dock = DockStyle.Fill,
+            ForeColor = NihaTheme.Muted,
+            Font = NihaTheme.UiFont(8.5f),
+            TextAlign = ContentAlignment.MiddleRight,
+        };
+
+        card.Controls.Add(_updateStatus);
+        card.Controls.Add(row);
+        card.Controls.Add(_chkAutoUpdate);
+        card.Controls.Add(_chkAutostart);
+        card.Controls.Add(title);
+        return card;
+    }
 
     private Panel BuildHeader()
     {

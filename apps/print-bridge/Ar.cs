@@ -48,7 +48,20 @@ public static class Ar
     public const string OpenPrintCenter = "فتح مركز الطباعة";
     public const string ShowWindow = "فتح النافذة";
     public const string Exit = "خروج";
-    public const string StartWithWindows = "التشغيل مع Windows";
+    public const string StartWithWindows = "التشغيل تلقائيًا مع Windows";
+    public const string AutoUpdate = "تحديث تلقائي للبرنامج";
+    public const string CheckUpdate = "التحقق من التحديث";
+    public const string UpdateNow = "تحديث الآن";
+    public const string UpdateAvailableFmt = "يتوفر تحديث: {0} ← {1}";
+    public const string UpdateUpToDateFmt = "أحدث إصدار مثبت ({0})";
+    public const string UpdateCheckFail = "تعذّر التحقق من التحديث";
+    public const string UpdateNoUrl = "رابط مركز الطباعة غير متوفر";
+    public const string UpdateBadPackage = "حزمة التحديث غير صالحة";
+    public const string UpdateApplying = "جاري التحديث وإعادة التشغيل…";
+    public const string UpdateFail = "فشل التحديث";
+    public const string UpdateConfirm =
+        "سيتم تنزيل الإصدار الجديد وإعادة تشغيل البرنامج. المتابعة؟";
+    public const string Settings = "إعدادات الجهاز";
 
     public const string Advanced = "التشخيص المتقدم";
     public const string HideAdvanced = "إخفاء التشخيص";

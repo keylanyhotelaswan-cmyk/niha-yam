@@ -12,7 +12,12 @@ public sealed class BridgeConfig
     public string? RestaurantName { get; set; }
     public string? RestaurantId { get; set; }
     public string? PrintCenterUrl { get; set; }
-    public bool StartWithWindows { get; set; }
+    /// <summary>Start Bridge when Windows logs in (default ON for POS PCs).</summary>
+    public bool StartWithWindows { get; set; } = true;
+    /// <summary>Once true, we no longer overwrite StartWithWindows on upgrade defaults.</summary>
+    public bool StartWithWindowsInitialized { get; set; }
+    /// <summary>When true, Bridge checks Print Center manifest and can self-update.</summary>
+    public bool AutoUpdate { get; set; } = true;
     public int PollMs { get; set; } = 1500;
     public string? LastPrintSummary { get; set; }
     public DateTimeOffset? LastPrintAt { get; set; }
