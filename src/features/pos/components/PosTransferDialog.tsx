@@ -22,6 +22,15 @@ type Props = {
   treasuries: PosOperationalTreasury[]
 }
 
+/** Matches server: least(approved ledger, operational), never negative. */
+function transferableOf(tr: PosOperationalTreasury | undefined): number {
+  if (!tr) return 0
+  const operational = Number(tr.balance ?? 0)
+  const approved =
+    tr.approved_balance != null ? Number(tr.approved_balance) : operational
+  return Math.max(0, Math.min(operational, approved))
+}
+
 export function PosTransferDialog({ open, onOpenChange, treasuries }: Props) {
   const [sourceId, setSourceId] = useState('')
   const [destId, setDestId] = useState('')
@@ -30,8 +39,8 @@ export function PosTransferDialog({ open, onOpenChange, treasuries }: Props) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const drawer = treasuries.find((t) => t.code === 'drawer')
-  const digitals = treasuries.filter((t) => t.code !== 'drawer')
+  const drawer = treasuries.find((row) => row.code === 'drawer')
+  const digitals = treasuries.filter((row) => row.code !== 'drawer')
 
   useEffect(() => {
     if (open) {
@@ -44,6 +53,7 @@ export function PosTransferDialog({ open, onOpenChange, treasuries }: Props) {
   }, [open, drawer?.id, digitals])
 
   const source = treasuries.find((tr) => tr.id === sourceId)
+  const sourceAvailable = transferableOf(source)
 
   const destOptions = useMemo(() => {
     if (!source) return treasuries
@@ -56,6 +66,10 @@ export function PosTransferDialog({ open, onOpenChange, treasuries }: Props) {
     const value = Number(amount)
     if (!sourceId || !destId || !Number.isFinite(value) || value <= 0) {
       setError(t.pos.ops.invalidAmount)
+      return
+    }
+    if (value > sourceAvailable + 1e-9) {
+      setError(t.pos.errors.INSUFFICIENT_FUNDS)
       return
     }
     setSubmitting(true)
@@ -104,7 +118,7 @@ export function PosTransferDialog({ open, onOpenChange, treasuries }: Props) {
             >
               {treasuries.map((tr) => (
                 <option key={tr.id} value={tr.id}>
-                  {tr.name} ({formatMoney(tr.balance)})
+                  {tr.name} ({formatMoney(transferableOf(tr))})
                 </option>
               ))}
             </select>
@@ -118,7 +132,7 @@ export function PosTransferDialog({ open, onOpenChange, treasuries }: Props) {
             >
               {destOptions.map((tr) => (
                 <option key={tr.id} value={tr.id}>
-                  {tr.name} ({formatMoney(tr.balance)})
+                  {tr.name} ({formatMoney(transferableOf(tr))})
                 </option>
               ))}
             </select>
@@ -135,7 +149,7 @@ export function PosTransferDialog({ open, onOpenChange, treasuries }: Props) {
             />
             {source ? (
               <p className="text-muted-foreground text-xs">
-                {t.pos.ops.available}: {formatMoney(source.balance)}
+                {t.pos.ops.available}: {formatMoney(sourceAvailable)}
               </p>
             ) : null}
           </div>

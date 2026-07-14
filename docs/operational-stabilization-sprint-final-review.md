@@ -50,12 +50,18 @@
 
 ### ما لم يُغيَّر (ليس Bug)
 - الإرسال الفوري من POS يبقى كما في M5 (عمليات تشغيلية مقيّدة)، وليس مسار F1 للمدير.
+- شارة «نقدي» في ملخص الوردية = مجموع تحصيلات نقدية (pending+approved) وليست الرصيد القابل للتحويل.
+
+### Hotfix follow-up (2026-07-14)
+- **Bug:** الحوار عرض `operational` (مثل 40) بينما `pos_operational_transfer` كان يفحص `treasury_balance` فقط (مثل −260) → يظهر متاحًا ثم يفشل دائمًا.
+- **Fix:** القابل للتحويل = `least(ledger, operational)` في الـ RPC وفي الواجهة (`…180000` + `PosTransferDialog`).
+- **Ops Feedback:** رسائل أوضح للتحقق/رفع الصورة؛ تنقية `context_id` غير الـ UUID (كان الخطأ العام نفسه لكل الحالات).
 
 ---
 
 ## Acceptance
 - [x] Root Cause موثّق لكل مشكلة
-- [x] Bug Fix (migrations `…170000` + `…171000`)
-- [x] Regression script `test:ops-stab` — 9/9
+- [x] Bug Fix (migrations `…170000` + `…171000` + `…180000`)
+- [x] Regression script `test:ops-stab`
 - [x] لا Features جديدة / لا redesign
 - [x] Migrations مطبَّقة على Supabase المرتبط

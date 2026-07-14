@@ -165,29 +165,33 @@ async function main() {
       }
     }
 
-    // POS operational transfer path (drawer → digital) if funds allow
-    const { data: bal2 } = await rpc('get_treasury_balances')
-    const drawer2 = (bal2 ?? []).find((t) => t.is_shift_drawer)
-    const dig2 = (bal2 ?? []).find((t) => !t.is_shift_drawer && t.id !== safe.id)
-    if (drawer2 && dig2 && Number(drawer2.balance ?? 0) >= 3) {
-      const posTr = await rpc('pos_operational_transfer', {
-        p_source_treasury_id: drawer2.id,
-        p_dest_treasury_id: dig2.id,
-        p_amount: 3,
-        p_reason: 'ops-stab pos',
+    // POS operational transfer: available = least(ledger, operational)
+    const ctx = await rpc('get_pos_context')
+    const opDrawer = (ctx.data?.operational_treasuries ?? []).find((t) => t.code === 'drawer')
+    const opDigital = (ctx.data?.operational_treasuries ?? []).find(
+      (t) => t.code === 'instapay' || t.code === 'ewallet',
+    )
+    if (opDrawer && opDigital) {
+      const operational = Number(opDrawer.balance ?? 0)
+      const approved = Number(opDrawer.approved_balance ?? operational)
+      const transferable = Math.max(0, Math.min(operational, approved))
+      record(
+        'Transferable ≤ operational & approved',
+        transferable <= operational + 1e-9 && transferable <= Math.max(0, approved) + 1e-9,
+        `op=${operational} approved=${approved} transferable=${transferable}`,
+      )
+
+      const over = await rpc('pos_operational_transfer', {
+        p_source_treasury_id: opDrawer.id,
+        p_dest_treasury_id: opDigital.id,
+        p_amount: transferable + 1,
+        p_reason: 'ops-stab over-available',
       })
-      // May fail TRANSFER_NOT_ALLOWED if dig2 not linked to instapay/ewallet — soft check
-      if (posTr.error && String(posTr.error.message).includes('TRANSFER_NOT_ALLOWED')) {
-        record('pos_operational_transfer constraints enforced', true, 'TRANSFER_NOT_ALLOWED as expected for non-digital dest')
-      } else {
-        record(
-          'pos_operational_transfer executes or funds fail cleanly',
-          !posTr.error ||
-            String(posTr.error.message).includes('INSUFFICIENT_FUNDS') ||
-            String(posTr.error.message).includes('TRANSFER_NOT_ALLOWED'),
-          posTr.error?.message ?? String(posTr.data),
-        )
-      }
+      record(
+        'POS transfer over transferable → INSUFFICIENT_FUNDS',
+        !!over.error && String(over.error.message).includes('INSUFFICIENT_FUNDS'),
+        over.error?.message ?? 'unexpected ok',
+      )
     }
   }
 

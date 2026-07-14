@@ -68,6 +68,13 @@ export async function submitOpsFeedback(input: {
   appVersion?: string | null
   bridgeVersion?: string | null
 }): Promise<{ id: string; reference: string }> {
+  const contextId =
+    input.contextId &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+      input.contextId,
+    )
+      ? input.contextId
+      : null
   const { data, error } = await rpc('submit_ops_feedback', {
     p_title: input.title,
     p_body: input.body,
@@ -75,7 +82,7 @@ export async function submitOpsFeedback(input: {
     p_priority: input.priority,
     p_image_path: input.imagePath ?? null,
     p_context_type: input.contextType ?? null,
-    p_context_id: input.contextId ?? null,
+    p_context_id: contextId,
     p_device_label: input.deviceLabel ?? null,
     p_app_version: input.appVersion ?? null,
     p_bridge_version: input.bridgeVersion ?? null,

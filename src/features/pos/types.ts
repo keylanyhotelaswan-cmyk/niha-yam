@@ -61,7 +61,10 @@ export type PosOperationalTreasury = {
   id: string
   name: string
   code: string
+  /** Operational (ledger + pending cash − pending expenses). */
   balance: number
+  /** Approved ledger only — posts immediately on transfer. */
+  approved_balance?: number
 }
 
 export type PosContext = {

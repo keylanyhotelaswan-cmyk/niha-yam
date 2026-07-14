@@ -58,13 +58,20 @@ export function PosFeedbackDialog({
 
   async function onSubmit() {
     if (title.trim().length < 2 || body.trim().length < 2) {
-      toast.error(t.opsFeedback.sendFailed)
+      toast.error(t.opsFeedback.validationFailed)
       return
     }
     setBusy(true)
     try {
       let imagePath: string | null = null
-      if (file) imagePath = await uploadOpsFeedbackImage(file)
+      if (file) {
+        try {
+          imagePath = await uploadOpsFeedbackImage(file)
+        } catch {
+          toast.error(t.opsFeedback.photoUploadFailed)
+          return
+        }
+      }
       await submitOpsFeedback({
         title: title.trim(),
         body: body.trim(),
@@ -72,15 +79,20 @@ export function PosFeedbackDialog({
         priority,
         imagePath,
         contextType: contextType ?? 'none',
-        contextId: contextId ?? null,
+        contextId: contextId || null,
         deviceLabel: navigator.userAgent.slice(0, 180),
         appVersion: APP_VERSION,
         bridgeVersion: bridgeVersion ?? null,
       })
       toast.success(t.opsFeedback.sent)
       onOpenChange(false)
-    } catch {
-      toast.error(t.opsFeedback.sendFailed)
+    } catch (e) {
+      const detail = e instanceof Error ? e.message : ''
+      toast.error(
+        detail && detail !== 'PERMISSION_DENIED'
+          ? `${t.opsFeedback.sendFailed} (${detail})`
+          : t.opsFeedback.sendFailed,
+      )
     } finally {
       setBusy(false)
     }
