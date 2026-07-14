@@ -30,6 +30,7 @@
     "test:oh-print": "node scripts/test-oh-print-stress.mjs",
     "test:oh-shift": "node scripts/test-oh-shift-stress.mjs",
     "test:oh": "node scripts/test-oh-orders-stress.mjs && node scripts/test-oh-print-stress.mjs && node scripts/test-oh-shift-stress.mjs",
+    "test:ops-stab": "node scripts/test-ops-stab.mjs",
     "test:chaos": "node scripts/test-chaos-suite.mjs",
     "test:chaos-fuzz": "node scripts/test-chaos-fuzz.mjs",
     "test:pos-hold": "node --experimental-strip-types scripts/test-pos-hold.ts",

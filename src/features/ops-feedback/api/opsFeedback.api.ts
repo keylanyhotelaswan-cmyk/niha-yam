@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase/client'
+import { fetchStaffProfile } from '@/shared/session/session.api'
 
 export type OpsFeedbackKind = 'problem' | 'suggestion' | 'inquiry' | 'note'
 export type OpsFeedbackPriority = 'normal' | 'important' | 'urgent'
@@ -137,8 +138,15 @@ export async function listOpsFeedbackComments(
 }
 
 export async function uploadOpsFeedbackImage(file: File): Promise<string> {
+  const profile = await fetchStaffProfile()
+  if (!profile?.restaurant_id) {
+    throw new Error('PERMISSION_DENIED')
+  }
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
-  const path = `${crypto.randomUUID()}.${ext}`
+  const safeExt = ['jpg', 'jpeg', 'png', 'webp', 'heic'].includes(ext)
+    ? ext
+    : 'jpg'
+  const path = `${profile.restaurant_id}/${crypto.randomUUID()}.${safeExt}`
   const { error } = await supabase.storage.from('ops-feedback').upload(path, file, {
     cacheControl: '3600',
     upsert: false,

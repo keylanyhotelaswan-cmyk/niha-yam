@@ -80,7 +80,27 @@ export function OpsFeedbackAdminPage() {
 
       <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
         <div className="space-y-2">
-          {rows.length === 0 ? (
+          {listQuery.isError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+              <p>{t.opsFeedback.loadFailed}</p>
+              <p className="mt-1 text-xs opacity-80">
+                {listQuery.error instanceof Error
+                  ? listQuery.error.message
+                  : ''}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => void listQuery.refetch()}
+              >
+                {t.opsFeedback.retry}
+              </Button>
+            </div>
+          ) : listQuery.isLoading ? (
+            <p className="text-muted-foreground text-sm">…</p>
+          ) : rows.length === 0 ? (
             <p className="text-muted-foreground text-sm">{t.opsFeedback.empty}</p>
           ) : (
             rows.map((row) => (

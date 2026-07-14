@@ -38,6 +38,8 @@ export const opsFeedback = {
     closed: 'مغلق',
   },
   empty: 'لا توجد ملاحظات بعد.',
+  loadFailed: 'تعذّر تحميل الملاحظات. حاول مرة أخرى.',
+  retry: 'إعادة المحاولة',
   cashier: 'الكاشير',
   shift: 'الوردية',
   when: 'الوقت',
