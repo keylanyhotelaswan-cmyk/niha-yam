@@ -83,10 +83,18 @@ export function PosTransferDialog({
         .limit(20)
       if (qErr) throw qErr
       const rows = data ?? []
-      const staffIds = [...new Set(rows.map((r) => r.created_by).filter(Boolean))]
+      const staffIds = [
+        ...new Set(
+          rows
+            .map((r) => r.created_by)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ]
       const treasuryIds = [
         ...new Set(
-          rows.flatMap((r) => [r.source_treasury_id, r.dest_treasury_id]),
+          rows
+            .flatMap((r) => [r.source_treasury_id, r.dest_treasury_id])
+            .filter((id): id is string => Boolean(id)),
         ),
       ]
       const [{ data: staff }, { data: tres }] = await Promise.all([
