@@ -33,6 +33,7 @@
     "test:ops-stab": "node scripts/test-ops-stab.mjs",
     "test:pos-ops-ux": "node --experimental-strip-types scripts/test-pos-ops-ux.mjs",
     "test:pos-sale-polish": "node --experimental-strip-types scripts/test-pos-sale-polish.mjs",
+    "test:order-cancel": "node --experimental-strip-types scripts/test-order-cancel.mjs",
     "test:chaos": "node scripts/test-chaos-suite.mjs",
     "test:chaos-fuzz": "node scripts/test-chaos-fuzz.mjs",
     "test:pos-hold": "node --experimental-strip-types scripts/test-pos-hold.ts",

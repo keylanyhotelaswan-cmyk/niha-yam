@@ -21,6 +21,7 @@ import { CustomerProfileDrawer } from '@/features/customers/components/CustomerP
 import { DeliveryDriversDialog } from '@/features/drivers/components/DeliveryDriversDialog'
 import { FinancialAdjustPanel } from '@/features/orders/components/FinancialAdjustPanel'
 import { OrderEditDialog } from '@/features/orders/components/OrderEditDialog'
+import { evaluateOrderCancel } from '@/features/orders/utils/cancelOrder'
 import { OrderCancelDialog } from '@/features/orders/components/OrderCancelDialog'
 import { OrderMoneySummary } from '@/features/orders/components/OrderMoneySummary'
 import { ReprintDocumentsDialog } from '@/features/orders/components/ReprintDocumentsDialog'
@@ -84,10 +85,20 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
       !detail.money?.has_approved_collection
     : false
   const canCollect = remaining > 0.001
-  const canCancel =
-    detail != null &&
-    detail.order.fulfillment_status !== 'cancelled' &&
-    detail.order.fulfillment_status !== 'delivered'
+  const cancelEligibility = detail
+    ? evaluateOrderCancel({
+        fulfillmentStatus: detail.order.fulfillment_status,
+        paymentStatus: detail.order.payment_status,
+        orderType: detail.order.order_type,
+        collectedAmount: detail.money?.collected_amount ?? 0,
+        isManager: Boolean(isManager),
+      })
+    : { allowed: false, code: 'ALREADY_CANCELLED' as const }
+  const canCancel = cancelEligibility.allowed
+  const cancelBlockReason = cancelEligibility.code
+    ? (t.orders.hub.cancelReasons[cancelEligibility.code] ??
+      t.orders.hub.cancelBlocked)
+    : null
   const hasApproved = Boolean(detail?.money?.has_approved_collection)
   const drivers = ctx?.delivery_drivers ?? []
 
@@ -573,14 +584,22 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
                 <Banknote className="size-5" />
                 {t.orders.hub.collectRemaining}
               </button>
-              <button
-                type="button"
-                disabled={!canCancel}
-                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-[#fecaca] bg-[#fef2f2] text-sm font-semibold text-[#b91c1c] disabled:opacity-40"
-                onClick={() => setCancelOpen(true)}
-              >
-                {t.orders.hub.cancelOrder}
-              </button>
+              <div className="space-y-1">
+                <button
+                  type="button"
+                  disabled={!canCancel}
+                  title={cancelBlockReason ?? undefined}
+                  className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-[#fecaca] bg-[#fef2f2] text-sm font-semibold text-[#b91c1c] disabled:opacity-40"
+                  onClick={() => setCancelOpen(true)}
+                >
+                  {t.orders.hub.cancelOrder}
+                </button>
+                {!canCancel && cancelBlockReason ? (
+                  <p className="px-1 text-[11px] leading-snug text-[#b91c1c]">
+                    {cancelBlockReason}
+                  </p>
+                ) : null}
+              </div>
               <button
                 type="button"
                 className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-[#e2e8f0] bg-white text-sm font-semibold text-[#334155]"

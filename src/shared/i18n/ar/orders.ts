@@ -32,6 +32,17 @@ export const orders = {
     cancelConfirm: 'تأكيد الإلغاء',
     cancelDone: 'تم إلغاء الطلب.',
     cancelBlocked: 'لا يمكن إلغاء هذا الطلب في حالته الحالية.',
+    cancelReasons: {
+      ALREADY_CANCELLED: 'الطلب ملغى بالفعل.',
+      CANCEL_BLOCKED_COLLECTED:
+        'لا يمكن إلغاء الطلب لأنه تم تحصيله بالفعل. استخدم مسار العكس/المرتجع حسب السياسة.',
+      CANCEL_BLOCKED_PARTIAL:
+        'لا يمكن إلغاء الطلب لوجود تحصيل جزئي. ألغِ التحصيل أو أكمل التسوية أولًا.',
+      CANCEL_BLOCKED_IN_PROGRESS:
+        'لا يمكن إلغاء الطلب لأنه دخل التنفيذ/أُرسل للمطبخ. اطلب المدير إن لزم.',
+      CANCEL_BLOCKED_DELIVERED:
+        'لا يمكن إلغاء الطلب بعد التسليم.',
+    },
     saveEdit: 'حفظ التعديل',
     editSaved: 'تم حفظ التعديل.',
     freeEditBlocked: 'لا يمكن التعديل الحر بعد اعتماد التحصيل.',
@@ -206,5 +217,13 @@ export const orders = {
     EMPTY_CART: 'السلة فارغة.',
     ORDER_NOT_EDITABLE: 'الطلب غير قابل للتعديل.',
     CANCEL_REASON_REQUIRED: 'سبب الإلغاء مطلوب.',
+    ALREADY_CANCELLED: 'الطلب ملغى بالفعل.',
+    CANCEL_BLOCKED_COLLECTED:
+      'لا يمكن إلغاء الطلب لأنه تم تحصيله بالفعل.',
+    CANCEL_BLOCKED_PARTIAL:
+      'لا يمكن إلغاء الطلب لوجود تحصيل جزئي.',
+    CANCEL_BLOCKED_IN_PROGRESS:
+      'لا يمكن إلغاء الطلب لأنه دخل التنفيذ/أُرسل للمطبخ.',
+    CANCEL_BLOCKED_DELIVERED: 'لا يمكن إلغاء الطلب بعد التسليم.',
   },
 } as const

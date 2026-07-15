@@ -255,6 +255,17 @@ export async function updateFulfillmentStatus(
   if (error) throw wrap(error)
 }
 
+export async function cancelOrder(
+  orderId: string,
+  reason: string,
+): Promise<void> {
+  const { error } = await rpc('cancel_order', {
+    p_order_id: orderId,
+    p_reason: reason.trim(),
+  })
+  if (error) throw wrap(error)
+}
+
 export async function reprintOrder(
   orderId: string,
   reason: string,

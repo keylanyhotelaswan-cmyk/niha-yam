@@ -12,7 +12,7 @@ import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Alert, AlertDescription } from '@/shared/components/ui/alert'
-import { updateFulfillmentStatus } from '@/features/orders/api/orders.api'
+import { cancelOrder } from '@/features/orders/api/orders.api'
 import { t } from '@/shared/i18n'
 
 type Props = {
@@ -35,7 +35,7 @@ export function OrderCancelDialog({
     mutationFn: () => {
       const trimmed = reason.trim()
       if (!trimmed) throw new Error(t.orders.hub.cancelReasonPlaceholder)
-      return updateFulfillmentStatus(orderId, 'cancelled', trimmed)
+      return cancelOrder(orderId, trimmed)
     },
     onSuccess: () => {
       toast.success(t.orders.hub.cancelDone)
