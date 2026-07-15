@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase/client'
 import { mapRpcError } from '@/shared/errors/rpc-error'
 import { t } from '@/shared/i18n'
+import type { DiscountPayload } from '@/shared/access/discountPermissions'
 import type { Database } from '@/types/database.generated'
 import type {
   ApprovePendingResult,
@@ -77,6 +78,7 @@ export async function createUnpaidOrder(input: {
   orderNote?: string | null
   dineInTableRef?: string | null
   deliveryDriverId?: string | null
+  discount?: DiscountPayload
 }): Promise<{ order_id: string; reference: string; money: unknown }> {
   const { data, error } = await rpc('create_unpaid_order', {
     p_items: input.items,
@@ -92,7 +94,15 @@ export async function createUnpaidOrder(input: {
     p_delivery_driver_id: input.deliveryDriverId ?? null,
   })
   if (error) throw wrap(error)
-  return data as { order_id: string; reference: string; money: unknown }
+  const result = data as { order_id: string; reference: string; money: unknown }
+  if (input.discount !== undefined && input.discount !== null) {
+    const { error: discErr } = await rpc('apply_order_discount', {
+      p_order_id: result.order_id,
+      p_discount: input.discount,
+    })
+    if (discErr) throw wrap(discErr)
+  }
+  return result
 }
 
 export async function editPendingOrder(input: {
@@ -102,6 +112,7 @@ export async function editPendingOrder(input: {
   customerName?: string | null
   tenders?: TenderInput[] | null
   orderNote?: string | null
+  discount?: DiscountPayload | undefined
 }): Promise<{ order_id: string; money: unknown; requires_review: boolean }> {
   const { data, error } = await rpc('edit_pending_order', {
     p_order_id: input.orderId,
@@ -112,6 +123,13 @@ export async function editPendingOrder(input: {
     p_order_note: input.orderNote ?? null,
   })
   if (error) throw wrap(error)
+  if (input.discount !== undefined) {
+    const { error: discErr } = await rpc('apply_order_discount', {
+      p_order_id: input.orderId,
+      p_discount: input.discount,
+    })
+    if (discErr) throw wrap(discErr)
+  }
   return data as {
     order_id: string
     money: unknown
@@ -227,10 +245,12 @@ export async function rejectExpense(id: string, reason: string): Promise<void> {
 export async function updateFulfillmentStatus(
   orderId: string,
   status: FulfillmentStatus,
+  reason?: string | null,
 ): Promise<void> {
   const { error } = await rpc('update_fulfillment_status', {
     p_order_id: orderId,
     p_status: status,
+    p_reason: reason?.trim() || null,
   })
   if (error) throw wrap(error)
 }

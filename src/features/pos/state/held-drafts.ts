@@ -49,12 +49,14 @@ export function takeHeldDraft<T extends { id: string }>(
  */
 export function shouldIgnoreSellDismiss(opts: {
   paymentOpen: boolean
+  payLaterOpen?: boolean
   hasModifierPicker: boolean
   hasOpenPrice: boolean
   hasLineExtras: boolean
 }): boolean {
   return (
     opts.paymentOpen ||
+    Boolean(opts.payLaterOpen) ||
     opts.hasModifierPicker ||
     opts.hasOpenPrice ||
     opts.hasLineExtras

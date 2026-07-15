@@ -24,6 +24,8 @@ type Props = {
   collectionStatusTotals?: ShiftCollectionStatusTotals | null
   /** Payment-method breakdown for the same scope as collectionStatusTotals. */
   paymentMethodTotals?: ShiftPaymentMethodTotal[] | null
+  /** Cash that counts toward drawer (from collection totals RPC). */
+  trustCashTotal?: number | null
   /**
    * Manager/admin only: pending vs approved KPIs.
    * Cashiers see revenue as normal collected income — no pending/approved axis.
@@ -40,6 +42,7 @@ export function ShiftSummary({
   report,
   collectionStatusTotals,
   paymentMethodTotals,
+  trustCashTotal,
   showApprovalMetrics = false,
 }: Props) {
   // Prefer order-derived totals (pending + approved). Fall back to shift pending-only.
@@ -59,15 +62,26 @@ export function ShiftSummary({
 
   const cashSales = showApprovalMetrics
     ? Number(report.cash_sales ?? 0)
-    : paymentMethodTotals != null
-      ? operationalCashSales
-      : Number(report.cash_sales ?? 0)
+    : trustCashTotal != null
+      ? trustCashTotal
+      : paymentMethodTotals != null
+        ? operationalCashSales
+        : Number(report.cash_sales ?? 0)
+
+  const pendingExpenses = Number(report.pending_expenses_amount ?? 0)
 
   const expectedCash = showApprovalMetrics
     ? Number(report.expected_cash ?? 0)
-    : report.operational_drawer_balance != null
-      ? Number(report.operational_drawer_balance)
-      : Number(report.expected_cash ?? 0)
+    : paymentMethodTotals != null || trustCashTotal != null
+      ? Number(report.opening_balance ?? 0) +
+        Number(report.opening_float ?? 0) +
+        cashSales -
+        Number(report.cash_drops ?? 0) -
+        Number(report.expenses ?? 0) -
+        pendingExpenses
+      : report.operational_drawer_balance != null
+        ? Number(report.operational_drawer_balance)
+        : Number(report.expected_cash ?? 0)
 
   const rows: Row[] = [
     ...(Math.abs(report.opening_balance) > 0.001
@@ -138,13 +152,24 @@ export function ShiftSummary({
           </div>
         ) : null}
         {showApprovalMetrics &&
-        (report.pending_expenses_amount ?? 0) > 0.001 ? (
+        pendingExpenses > 0.001 ? (
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">
               {t.treasury.shift.pendingExpenses}
             </span>
             <span>
-              {formatMoney(Number(report.pending_expenses_amount))}
+              {formatMoney(pendingExpenses)}
+              {report.pending_expenses_count
+                ? ` (${report.pending_expenses_count})`
+                : ''}
+            </span>
+          </div>
+        ) : null}
+        {!showApprovalMetrics && pendingExpenses > 0.001 ? (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-[#b45309]">{t.treasury.shift.pendingExpenses}</span>
+            <span className="text-[#b45309]">
+              {formatMoney(-pendingExpenses)}
               {report.pending_expenses_count
                 ? ` (${report.pending_expenses_count})`
                 : ''}

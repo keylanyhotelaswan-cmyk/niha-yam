@@ -1,8 +1,9 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { RoleSelect } from '@/features/staff/components/RoleSelect'
+import { DiscountPermissionsSection } from '@/features/staff/components/DiscountPermissionsSection'
 import { useBranches } from '@/features/staff/hooks/useBranches'
 import { useUpdateStaff } from '@/features/staff/hooks/useUpdateStaff'
 import {
@@ -10,6 +11,10 @@ import {
   type EditStaffFormValues,
 } from '@/features/staff/schemas/staff.schemas'
 import type { StaffListItem, StaffRole } from '@/features/staff/types'
+import {
+  DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE,
+  type DiscountPermissionConfig,
+} from '@/shared/access/discountPermissions'
 import { Alert, AlertDescription } from '@/shared/components/ui/alert'
 import { Button } from '@/shared/components/ui/button'
 import {
@@ -45,6 +50,15 @@ export function EditStaffDialog({
     resolver: zodResolver(editStaffSchema),
     defaultValues: { displayName: staff.display_name, role: currentRole },
   })
+
+  const watchedRole = form.watch('role')
+  const [discountPerms, setDiscountPerms] = useState<DiscountPermissionConfig>(
+    DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[currentRole],
+  )
+
+  useEffect(() => {
+    setDiscountPerms(DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[watchedRole])
+  }, [watchedRole])
 
   // Re-seed when the target changes (dialog reused across rows).
   useEffect(() => {
@@ -132,6 +146,13 @@ export function EditStaffDialog({
               <p className="text-destructive text-xs">{errors.role.message}</p>
             ) : null}
           </div>
+
+          <DiscountPermissionsSection
+            role={watchedRole}
+            value={discountPerms}
+            onChange={setDiscountPerms}
+            readOnly
+          />
 
           {branchesQuery.isError ? (
             <Alert variant="destructive">

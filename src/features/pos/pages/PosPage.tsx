@@ -50,6 +50,7 @@ import { formatMoney } from '@/features/treasury/utils/format'
 import { cn } from '@/shared/utils/cn'
 import { t } from '@/shared/i18n'
 import { ShiftSummary } from '@/features/treasury/components/ShiftSummary'
+import { PosShiftExpensesPanel } from '@/features/pos/components/PosShiftExpensesPanel'
 import type { ShiftReport } from '@/features/treasury/types'
 
 type HubFilter =
@@ -220,6 +221,7 @@ export function PosPage() {
   const {
     collectionStatusTotals,
     paymentMethodTotals: collectionPaymentTotals,
+    trustCashTotal,
     scope: collectionScope,
     setScope: setCollectionScope,
     canToggleDay,
@@ -960,11 +962,15 @@ export function PosPage() {
             </div>
           ) : null}
           {shift ? (
-            <ShiftSummary
-              report={shift}
-              collectionStatusTotals={collectionStatusTotals}
-              paymentMethodTotals={collectionPaymentTotals}
-            />
+            <>
+              <ShiftSummary
+                report={shift}
+                collectionStatusTotals={collectionStatusTotals}
+                paymentMethodTotals={collectionPaymentTotals}
+                trustCashTotal={trustCashTotal}
+              />
+              <PosShiftExpensesPanel shift={shift} />
+            </>
           ) : (
             <p className="text-sm text-[#64748b]">{t.pos.shift.closed}</p>
           )}

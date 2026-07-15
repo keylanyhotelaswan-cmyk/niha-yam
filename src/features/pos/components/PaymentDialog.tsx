@@ -11,6 +11,7 @@ import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Alert, AlertDescription } from '@/shared/components/ui/alert'
+import { DiscountFields } from '@/features/pos/components/DiscountFields'
 import { MoneyTotalsBreakdown } from '@/features/orders/components/MoneyTotalsBreakdown'
 import { finalizeSale } from '@/features/pos/api/pos.api'
 import { formatMoney } from '@/features/treasury/utils/format'
@@ -21,7 +22,13 @@ import {
   netAfterDiscount,
   roundMoney,
 } from '@/features/pos/utils/saleMoney'
+import {
+  resolveDiscountPermissions,
+  validateDiscountInput,
+  type DiscountPermissionConfig,
+} from '@/shared/access/discountPermissions'
 import { sortPaymentMethods } from '@/features/pos/utils/paymentMethods'
+import { useSession } from '@/shared/session/SessionProvider'
 import { t } from '@/shared/i18n'
 
 export type PaymentOrderMeta = {
@@ -84,6 +91,11 @@ function computeTotals(
   return { parsed, tenderSum, nonCash, cashTender, cashRequired, change, digitalOverpay }
 }
 
+function mapDiscountError(code: string): string {
+  const key = code as keyof typeof t.pos.errors
+  return t.pos.errors[key] ?? t.pos.errors.generic
+}
+
 export { sortPaymentMethods } from '@/features/pos/utils/paymentMethods'
 
 export function PaymentDialog({
@@ -96,6 +108,13 @@ export function PaymentDialog({
   orderMeta,
   onSuccess,
 }: Props) {
+  const { staff } = useSession()
+  const roles = staff?.branches.map((b) => b.role) ?? []
+  const discountPermissions = useMemo(
+    () => resolveDiscountPermissions(canDiscount, roles),
+    [canDiscount, roles],
+  )
+
   const methods = useMemo(
     () => sortPaymentMethods(paymentMethods),
     [paymentMethods],
@@ -112,7 +131,7 @@ export function PaymentDialog({
 
   const discountAmount = computeDiscountAmount(
     subtotal,
-    discountEnabled,
+    discountEnabled && discountPermissions.manual,
     discountType,
     Number(discountValue) || 0,
   )
@@ -130,7 +149,6 @@ export function PaymentDialog({
     }
   }, [open, defaultMethod, subtotal])
 
-  // Keep primary tender aligned with post-discount due when discount changes.
   useEffect(() => {
     if (!open) return
     setRows((prev) => {
@@ -161,6 +179,15 @@ export function PaymentDialog({
     )
   }
 
+  function validateDiscount(perms: DiscountPermissionConfig): string | null {
+    if (!discountEnabled) return null
+    const value = Number(discountValue) || 0
+    const permErr = validateDiscountInput(perms, discountType, value)
+    if (permErr) return mapDiscountError(permErr)
+    if (!discountReason.trim()) return t.pos.errors.DISCOUNT_REASON_REQUIRED
+    return null
+  }
+
   async function submit() {
     setError(null)
     if (methods.length === 0) {
@@ -179,12 +206,10 @@ export function PaymentDialog({
       setError(t.pos.payment.cashShort)
       return
     }
-    if (discountEnabled) {
-      const value = Number(discountValue) || 0
-      if (value <= 0 || !discountReason.trim()) {
-        setError(t.pos.errors.DISCOUNT_REASON_REQUIRED)
-        return
-      }
+    const discErr = validateDiscount(discountPermissions)
+    if (discErr) {
+      setError(discErr)
+      return
     }
 
     const tenders: TenderInput[] = parsed
@@ -249,54 +274,23 @@ export function PaymentDialog({
             </Alert>
           ) : null}
 
-          {canDiscount ? (
-            <div className="space-y-2 rounded-md border p-3">
-              <label className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  checked={discountEnabled}
-                  onChange={(e) => setDiscountEnabled(e.target.checked)}
-                />
-                {t.pos.payment.discount}
-              </label>
-              {discountEnabled ? (
-                <div className="grid gap-2">
-                  <select
-                    className="border-input bg-background h-9 rounded-md border px-2 text-sm"
-                    value={discountType}
-                    onChange={(e) =>
-                      setDiscountType(e.target.value as 'amount' | 'percent')
-                    }
-                  >
-                    <option value="amount">{t.pos.payment.discountTypes.amount}</option>
-                    <option value="percent">{t.pos.payment.discountTypes.percent}</option>
-                  </select>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    dir="ltr"
-                    placeholder={
-                      discountType === 'percent'
-                        ? t.pos.payment.discountPercent
-                        : t.pos.payment.discountAmount
-                    }
-                    value={discountValue}
-                    onChange={(e) => setDiscountValue(e.target.value)}
-                  />
-                  <Input
-                    placeholder={t.pos.payment.discountReason}
-                    value={discountReason}
-                    onChange={(e) => setDiscountReason(e.target.value)}
-                  />
-                </div>
-              ) : null}
-            </div>
-          ) : null}
+          <DiscountFields
+            permissions={discountPermissions}
+            enabled={discountEnabled}
+            onEnabledChange={setDiscountEnabled}
+            type={discountType}
+            onTypeChange={setDiscountType}
+            value={discountValue}
+            onValueChange={setDiscountValue}
+            reason={discountReason}
+            onReasonChange={setDiscountReason}
+          />
 
           <MoneyTotalsBreakdown
             subtotal={subtotal}
             discountAmount={discountAmount}
+            discountType={discountEnabled ? discountType : null}
+            discountValue={discountEnabled ? Number(discountValue) || null : null}
             total={orderTotal}
             highlightRemaining
           />

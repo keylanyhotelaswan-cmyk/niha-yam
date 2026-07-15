@@ -10,6 +10,7 @@ import { Button } from '@/shared/components/ui/button'
 import { CashDropDialog } from '@/features/treasury/components/dialogs/CashDropDialog'
 import { ShiftSummary } from '@/features/treasury/components/ShiftSummary'
 import { PosExpenseDialog } from '@/features/pos/components/PosExpenseDialog'
+import { PosShiftExpensesPanel } from '@/features/pos/components/PosShiftExpensesPanel'
 import { PosTransferDialog } from '@/features/pos/components/PosTransferDialog'
 import { PosFeedbackDialog } from '@/features/ops-feedback/components/PosFeedbackDialog'
 import { posKeys } from '@/features/pos/hooks/pos.keys'
@@ -45,6 +46,7 @@ export function PosOpsMenu({
   const {
     collectionStatusTotals,
     paymentMethodTotals,
+    trustCashTotal,
     scope,
     setScope,
     canToggleDay,
@@ -168,11 +170,15 @@ export function PosOpsMenu({
             </div>
           ) : null}
           {shift ? (
-            <ShiftSummary
-              report={shift}
-              collectionStatusTotals={collectionStatusTotals}
-              paymentMethodTotals={paymentMethodTotals}
-            />
+            <>
+              <ShiftSummary
+                report={shift}
+                collectionStatusTotals={collectionStatusTotals}
+                paymentMethodTotals={paymentMethodTotals}
+                trustCashTotal={trustCashTotal}
+              />
+              <PosShiftExpensesPanel shift={shift} />
+            </>
           ) : null}
         </DialogContent>
       </Dialog>

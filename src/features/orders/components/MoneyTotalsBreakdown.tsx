@@ -1,4 +1,10 @@
 import { formatMoney } from '@/features/treasury/utils/format'
+import {
+  formatDiscountHeadline,
+  formatDiscountValueLine,
+  hasDiscount,
+  type DiscountMeta,
+} from '@/features/pos/utils/formatDiscount'
 import { cn } from '@/shared/utils/cn'
 import { t } from '@/shared/i18n'
 
@@ -6,6 +12,8 @@ type Props = {
   /** Gross before discount */
   subtotal: number
   discountAmount?: number | null
+  discountType?: DiscountMeta['type']
+  discountValue?: number | null
   /** Net due (after discount) — same as order.total */
   total: number
   collected?: number | null
@@ -19,21 +27,44 @@ type Props = {
 export function MoneyTotalsBreakdown({
   subtotal,
   discountAmount = 0,
+  discountType,
+  discountValue,
   total,
   collected,
   remaining,
   className,
   highlightRemaining,
 }: Props) {
-  const disc = Number(discountAmount ?? 0)
-  const showDiscount = disc > 0.001
+  const meta: DiscountMeta = {
+    type: discountType,
+    value: discountValue,
+    amount: discountAmount,
+  }
+  const showDiscount = hasDiscount(meta)
+  const discountHeadline = formatDiscountHeadline(meta)
+  const discountValueLine = formatDiscountValueLine(meta)
 
   return (
     <div className={cn('space-y-1.5 rounded-xl border border-[#e2e8f0] bg-[#f8fafc] p-3 text-sm', className)}>
       {showDiscount ? (
         <>
           <Row label={t.orders.money.subtotal} value={subtotal} />
-          <Row label={t.orders.money.discount} value={-disc} muted />
+          {discountHeadline ? (
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[#64748b]">{discountHeadline}</span>
+              {discountType === 'amount' ? (
+                <span dir="ltr" className="text-[#64748b]">
+                  {formatMoney(-Number(discountAmount ?? 0))}
+                </span>
+              ) : discountValueLine ? (
+                <span dir="ltr" className="text-[#64748b] text-xs">
+                  {discountValueLine}
+                </span>
+              ) : null}
+            </div>
+          ) : (
+            <Row label={t.orders.money.discount} value={-Number(discountAmount ?? 0)} muted />
+          )}
         </>
       ) : null}
       <Row

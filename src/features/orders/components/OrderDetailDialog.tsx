@@ -21,6 +21,7 @@ import { CustomerProfileDrawer } from '@/features/customers/components/CustomerP
 import { DeliveryDriversDialog } from '@/features/drivers/components/DeliveryDriversDialog'
 import { FinancialAdjustPanel } from '@/features/orders/components/FinancialAdjustPanel'
 import { OrderEditDialog } from '@/features/orders/components/OrderEditDialog'
+import { OrderCancelDialog } from '@/features/orders/components/OrderCancelDialog'
 import { OrderMoneySummary } from '@/features/orders/components/OrderMoneySummary'
 import { ReprintDocumentsDialog } from '@/features/orders/components/ReprintDocumentsDialog'
 import {
@@ -68,6 +69,7 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
   const [driverId, setDriverId] = useState('')
   const [driversOpen, setDriversOpen] = useState(false)
   const [reprintOpen, setReprintOpen] = useState(false)
+  const [cancelOpen, setCancelOpen] = useState(false)
 
   const detailQuery = useQuery({
     queryKey: ['orders', 'detail', orderId],
@@ -82,6 +84,10 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
       !detail.money?.has_approved_collection
     : false
   const canCollect = remaining > 0.001
+  const canCancel =
+    detail != null &&
+    detail.order.fulfillment_status !== 'cancelled' &&
+    detail.order.fulfillment_status !== 'delivered'
   const hasApproved = Boolean(detail?.money?.has_approved_collection)
   const drivers = ctx?.delivery_drivers ?? []
 
@@ -182,6 +188,8 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
                   money={detail.money}
                   subtotal={detail.order.subtotal}
                   discountAmount={detail.order.discount_amount}
+                  discountType={detail.order.discount_type}
+                  discountValue={detail.order.discount_value}
                 />
 
                 <div className="rounded-2xl border border-white bg-white p-4 text-xs shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
@@ -539,7 +547,7 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
           </div>
 
           {detail ? (
-            <div className="grid gap-2 border-t border-[#eef2f7] bg-white p-4 sm:grid-cols-3">
+            <div className="grid gap-2 border-t border-[#eef2f7] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
               <button
                 type="button"
                 disabled={!canEdit}
@@ -564,6 +572,14 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
               >
                 <Banknote className="size-5" />
                 {t.orders.hub.collectRemaining}
+              </button>
+              <button
+                type="button"
+                disabled={!canCancel}
+                className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl border border-[#fecaca] bg-[#fef2f2] text-sm font-semibold text-[#b91c1c] disabled:opacity-40"
+                onClick={() => setCancelOpen(true)}
+              >
+                {t.orders.hub.cancelOrder}
               </button>
               <button
                 type="button"
@@ -628,6 +644,8 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
             <MoneyTotalsBreakdown
               subtotal={detail.order.subtotal}
               discountAmount={detail.order.discount_amount}
+              discountType={detail.order.discount_type}
+              discountValue={detail.order.discount_value}
               total={detail.money?.order_total ?? detail.order.total}
               collected={detail.money?.collected_amount ?? 0}
               remaining={remaining}
@@ -669,6 +687,17 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
           </Button>
         </DialogContent>
       </Dialog>
+      {orderId ? (
+        <OrderCancelDialog
+          orderId={orderId}
+          open={cancelOpen}
+          onOpenChange={setCancelOpen}
+          onCancelled={() => {
+            void detailQuery.refetch()
+            void queryClient.invalidateQueries({ queryKey: ['orders'] })
+          }}
+        />
+      ) : null}
     </>
   )
 }

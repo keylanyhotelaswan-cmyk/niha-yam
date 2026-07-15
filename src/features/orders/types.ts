@@ -86,6 +86,9 @@ export type OrderDetail = {
     status: string
     subtotal: number
     discount_amount: number
+    discount_type?: 'amount' | 'percent' | null
+    discount_value?: number | null
+    discount_reason?: string | null
     total: number
     order_note: string | null
     customer_id: string | null

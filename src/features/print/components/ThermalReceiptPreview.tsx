@@ -479,10 +479,19 @@ export function ThermalReceiptPreview({
           typeof snapshot.discount_amount === 'number'
             ? snapshot.discount_amount
             : Number(snapshot.discount_amount ?? 0)
+        const discType = str(snapshot, 'discount_type')
+        const discValue = Number(snapshot.discount_value ?? 0)
         const tax =
           typeof snapshot.tax_amount === 'number'
             ? snapshot.tax_amount
             : Number(snapshot.tax_amount ?? 0)
+        const discLabel =
+          str(snapshot, 'discount_label_ar') ||
+          (discType === 'percent' && discValue > 0
+            ? `خصم ${discValue}%`
+            : discType === 'amount' && discValue > 0
+              ? `خصم ${money(discValue, cur)}`
+              : null)
         return (
           <SectionBox section={s}>
             <div className="border-2 border-neutral-900 px-2 py-3">
@@ -490,7 +499,26 @@ export function ThermalReceiptPreview({
                 <LabeledMoney field={subF} amount={snapshot.subtotal} cur={cur} />
               ) : null}
               {disc > 0 && discF ? (
-                <LabeledMoney field={discF} amount={disc} cur={cur} />
+                <>
+                  {discLabel ? (
+                    <div
+                      className={cn(alignClass(discF.align), discF.bold && 'font-bold')}
+                      style={{ fontSize: discF.font_pt }}
+                    >
+                      {discLabel}
+                    </div>
+                  ) : (
+                    <LabeledMoney field={discF} amount={disc} cur={cur} />
+                  )}
+                  {discType === 'percent' && disc > 0 ? (
+                    <div
+                      className={cn(alignClass(discF.align))}
+                      style={{ fontSize: Math.max(10, discF.font_pt - 2) }}
+                    >
+                      قيمة الخصم: {money(disc, cur)}
+                    </div>
+                  ) : null}
+                </>
               ) : null}
               {tax > 0 && taxF ? (
                 <LabeledMoney field={taxF} amount={tax} cur={cur} />

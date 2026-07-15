@@ -14,10 +14,10 @@ import { ModifierPickerDialog } from '@/features/pos/components/ModifierPickerDi
 import { LineExtrasDialog } from '@/features/pos/components/LineExtrasDialog'
 import { OpenPriceDialog } from '@/features/pos/components/OpenPriceDialog'
 import { PaymentDialog } from '@/features/pos/components/PaymentDialog'
+import { PayLaterCheckoutDialog } from '@/features/pos/components/PayLaterCheckoutDialog'
 import { usePosCart } from '@/features/pos/hooks/usePosCart'
 import { posKeys } from '@/features/pos/hooks/pos.keys'
 import { usePosContext, usePosMenu } from '@/features/pos/hooks/usePosQueries'
-import { createUnpaidOrder } from '@/features/orders/api/orders.api'
 import {
   fetchCustomerProfile,
   searchCustomers,
@@ -102,7 +102,7 @@ export function SellSessionDialog({
   const [suggestions, setSuggestions] = useState<CustomerListItem[]>([])
   const [suggestBusy, setSuggestBusy] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
-  const [payLaterBusy, setPayLaterBusy] = useState(false)
+  const [payLaterOpen, setPayLaterOpen] = useState(false)
   const [hydratedId, setHydratedId] = useState<string | null>(null)
   const closingRef = useRef(false)
 
@@ -252,6 +252,7 @@ export function SellSessionDialog({
 
   const blockingOverlay = shouldIgnoreSellDismiss({
     paymentOpen,
+    payLaterOpen,
     hasModifierPicker: modifierItem !== null,
     hasOpenPrice: openPriceItem !== null,
     hasLineExtras: extrasLine !== null,
@@ -330,31 +331,11 @@ export function SellSessionDialog({
     }
 
     void (async () => {
-      setPayLaterBusy(true)
       try {
-        const resolvedId = await resolveCustomerId()
-        const snap = { ...liveDraft(), customerId: resolvedId }
-        const meta = orderMetaFromDraft(snap)
-        const result = await createUnpaidOrder({
-          items: cart.lines.map((line) => ({
-            menu_item_id: line.menuItemId,
-            quantity: line.quantity,
-            modifier_option_ids: line.modifierOptionIds,
-            open_price: line.openPrice,
-            note: line.note,
-          })),
-          ...meta,
-        })
-        cart.clear()
-        void queryClient.invalidateQueries({ queryKey: posKeys.context() })
-        void queryClient.invalidateQueries({ queryKey: ['orders'] })
-        toast.success(t.pos.payment.success(String(result.reference)))
-        onCompleted()
-        finishClose()
+        await resolveCustomerId()
+        setPayLaterOpen(true)
       } catch (e) {
         toast.error(e instanceof Error ? e.message : t.orders.errors.generic)
-      } finally {
-        setPayLaterBusy(false)
       }
     })()
   }
@@ -785,7 +766,7 @@ export function SellSessionDialog({
               type="button"
               className="min-h-14 min-w-[180px] flex-1 rounded-2xl bg-[#22c55e] text-base font-semibold text-white shadow-[0_6px_18px_rgba(34,197,94,0.35)] disabled:opacity-40"
               disabled={
-                !hasOpenShift || cart.lines.length === 0 || payLaterBusy
+                !hasOpenShift || cart.lines.length === 0
               }
               onClick={handlePrimaryAction}
             >
@@ -852,6 +833,24 @@ export function SellSessionDialog({
             if (change > 0) {
               toast.message(`${t.pos.payment.change}: ${formatMoney(change)}`)
             }
+            onCompleted()
+            finishClose()
+          }}
+        />
+      ) : null}
+      {ctx && draft ? (
+        <PayLaterCheckoutDialog
+          open={payLaterOpen}
+          onOpenChange={setPayLaterOpen}
+          lines={cart.lines}
+          subtotal={cart.subtotal}
+          canDiscount={ctx.can_discount}
+          orderMeta={orderMetaFromDraft(liveDraft())}
+          onSuccess={(reference) => {
+            cart.clear()
+            void queryClient.invalidateQueries({ queryKey: posKeys.context() })
+            void queryClient.invalidateQueries({ queryKey: ['orders'] })
+            toast.success(t.pos.payment.success(reference))
             onCompleted()
             finishClose()
           }}

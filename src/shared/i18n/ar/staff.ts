@@ -43,6 +43,16 @@ export const staff = {
     submitEdit: 'حفظ التعديلات',
     created: 'تم إنشاء الموظف',
     updated: 'تم حفظ التعديلات',
+    discountSection: 'الخصومات',
+    discountSectionHint:
+      'الصلاحيات الحالية مرتبطة بالدور. التخصيص لكل موظف سيُفعَّل لاحقًا.',
+    discountManual: 'السماح بالخصم اليدوي',
+    discountTypeAmount: 'مبلغ ثابت',
+    discountTypePercent: 'نسبة مئوية',
+    discountMaxAmount: 'الحد الأقصى للمبلغ (ج.م)',
+    discountMaxPercent: 'الحد الأقصى للنسبة (%)',
+    discountCanEdit: 'يستطيع تعديل الخصم',
+    discountCanRemove: 'يستطيع إزالة الخصم',
   },
   password: {
     title: 'تغيير كلمة المرور',

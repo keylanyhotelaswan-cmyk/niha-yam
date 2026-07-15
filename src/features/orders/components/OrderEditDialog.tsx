@@ -13,6 +13,7 @@ import { Input } from '@/shared/components/ui/input'
 import { Label } from '@/shared/components/ui/label'
 import { Badge } from '@/shared/components/ui/badge'
 import { ModifierPickerDialog } from '@/features/pos/components/ModifierPickerDialog'
+import { DiscountFields } from '@/features/pos/components/DiscountFields'
 import { LineExtrasDialog } from '@/features/pos/components/LineExtrasDialog'
 import { OpenPriceDialog } from '@/features/pos/components/OpenPriceDialog'
 import { OrderMoneySummary } from '@/features/orders/components/OrderMoneySummary'
@@ -37,6 +38,14 @@ import {
   toggleSauceInNote,
 } from '@/features/pos/utils/line-note'
 import { t } from '@/shared/i18n'
+import {
+  computeDiscountAmount,
+} from '@/features/pos/utils/saleMoney'
+import {
+  resolveDiscountPermissions,
+  validateDiscountInput,
+} from '@/shared/access/discountPermissions'
+import { useSession } from '@/shared/session/SessionProvider'
 
 type Props = {
   open: boolean
@@ -114,6 +123,8 @@ async function loadModifierIds(
 
 export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) {
   const queryClient = useQueryClient()
+  const { staff } = useSession()
+  const roles = staff?.branches.map((b) => b.role) ?? []
   const menuQuery = usePosMenu()
   const contextQuery = usePosContext()
   const cart = usePosCart()
@@ -137,8 +148,14 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
   const [hydrated, setHydrated] = useState(false)
   const [replaceTender, setReplaceTender] = useState(false)
   const [tenderRows, setTenderRows] = useState<TenderRow[]>([])
+  const [discountEnabled, setDiscountEnabled] = useState(false)
+  const [discountType, setDiscountType] = useState<'amount' | 'percent'>('amount')
+  const [discountValue, setDiscountValue] = useState('')
+  const [discountReason, setDiscountReason] = useState('')
 
   const menu = menuQuery.data
+  const canDiscount = Boolean(contextQuery.data?.can_discount)
+  const discountPermissions = resolveDiscountPermissions(canDiscount, roles)
   const canEdit =
     detail.order.can_free_edit !== false &&
     !detail.money?.has_approved_collection
@@ -147,11 +164,13 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
   const lockedCollected = detail.money?.collected_amount ?? 0
   const tenderSum = tenderRows.reduce((s, r) => s + (Number(r.amount) || 0), 0)
   const previewCollected = replaceTender ? tenderSum : lockedCollected
-  const liveMoney = previewMoney(
+  const liveDiscountAmount = computeDiscountAmount(
     cart.subtotal,
-    Number(detail.order.discount_amount ?? 0),
-    previewCollected,
+    discountEnabled && discountPermissions.manual,
+    discountType,
+    Number(discountValue) || 0,
   )
+  const liveMoney = previewMoney(cart.subtotal, liveDiscountAmount, previewCollected)
 
   useEffect(() => {
     if (!open || !menu) return
@@ -205,6 +224,17 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
           ? [{ methodId: cash.id, amount: String(detail.money?.order_total ?? detail.order.total) }]
           : [],
       )
+      const hasDisc = Number(detail.order.discount_amount ?? 0) > 0
+      setDiscountEnabled(hasDisc)
+      setDiscountType(detail.order.discount_type ?? 'amount')
+      setDiscountValue(
+        detail.order.discount_value != null
+          ? String(detail.order.discount_value)
+          : hasDisc
+            ? String(detail.order.discount_amount)
+            : '',
+      )
+      setDiscountReason(detail.order.discount_reason ?? '')
       setHydrated(true)
     })()
 
@@ -328,6 +358,19 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
       }
     }
 
+    if (discountEnabled) {
+      const value = Number(discountValue) || 0
+      const permErr = validateDiscountInput(discountPermissions, discountType, value)
+      if (permErr) {
+        toast.error(t.pos.errors[permErr as keyof typeof t.pos.errors] ?? t.pos.errors.generic)
+        return
+      }
+      if (!discountReason.trim()) {
+        toast.error(t.pos.errors.DISCOUNT_REASON_REQUIRED)
+        return
+      }
+    }
+
     setSaving(true)
     try {
       await editPendingOrder({
@@ -343,6 +386,16 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
         customerPhone: customerPhone || null,
         orderNote: orderNote.trim(),
         tenders,
+        discount:
+          discountEnabled && liveDiscountAmount > 0
+            ? {
+                type: discountType,
+                value: Number(discountValue),
+                reason: discountReason.trim(),
+              }
+            : !discountEnabled && Number(detail.order.discount_amount ?? 0) > 0.001
+              ? null
+              : undefined,
       })
       toast.success(t.orders.hub.editSaved)
       void queryClient.invalidateQueries({ queryKey: ['orders'] })
@@ -703,10 +756,45 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
               </div>
 
               <div className="shrink-0 space-y-3 border-t bg-white p-3">
+                {discountPermissions.manual && discountPermissions.canEdit ? (
+                  <DiscountFields
+                    permissions={discountPermissions}
+                    enabled={discountEnabled}
+                    onEnabledChange={(next) => {
+                      if (!next && !discountPermissions.canRemove) return
+                      setDiscountEnabled(next)
+                    }}
+                    type={discountType}
+                    onTypeChange={setDiscountType}
+                    value={discountValue}
+                    onValueChange={setDiscountValue}
+                    reason={discountReason}
+                    onReasonChange={setDiscountReason}
+                  />
+                ) : Number(detail.order.discount_amount ?? 0) > 0 ? (
+                  <DiscountFields
+                    permissions={discountPermissions}
+                    enabled={false}
+                    onEnabledChange={() => {}}
+                    type={detail.order.discount_type ?? 'amount'}
+                    onTypeChange={() => {}}
+                    value={String(detail.order.discount_value ?? detail.order.discount_amount)}
+                    onValueChange={() => {}}
+                    reason={detail.order.discount_reason ?? ''}
+                    onReasonChange={() => {}}
+                    locked
+                  />
+                ) : null}
                 <OrderMoneySummary
                   money={liveMoney}
                   subtotal={cart.subtotal}
-                  discountAmount={Number(detail.order.discount_amount ?? 0)}
+                  discountAmount={liveDiscountAmount}
+                  discountType={discountEnabled ? discountType : detail.order.discount_type}
+                  discountValue={
+                    discountEnabled
+                      ? Number(discountValue) || null
+                      : detail.order.discount_value
+                  }
                 />
                 {!replaceTender ? (
                   <p className="text-muted-foreground text-xs">

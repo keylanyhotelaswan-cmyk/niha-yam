@@ -1,4 +1,8 @@
 import { MoneyTotalsBreakdown } from '@/features/orders/components/MoneyTotalsBreakdown'
+import {
+  formatDiscountHeadline,
+  hasDiscount,
+} from '@/features/pos/utils/formatDiscount'
 import { formatMoney } from '@/features/treasury/utils/format'
 import type { OrderMoney } from '@/features/orders/types'
 import { t } from '@/shared/i18n'
@@ -7,6 +11,8 @@ type Props = {
   money: OrderMoney | null | undefined
   subtotal?: number | null
   discountAmount?: number | null
+  discountType?: 'amount' | 'percent' | null
+  discountValue?: number | null
   compact?: boolean
 }
 
@@ -14,6 +20,8 @@ export function OrderMoneySummary({
   money,
   subtotal,
   discountAmount,
+  discountType,
+  discountValue,
   compact,
 }: Props) {
   if (!money) return null
@@ -24,14 +32,14 @@ export function OrderMoneySummary({
 
   const sub = subtotal != null ? Number(subtotal) : null
   const disc = Number(discountAmount ?? 0)
+  const meta = { type: discountType, value: discountValue, amount: disc }
 
   if (compact) {
+    const headline = formatDiscountHeadline(meta)
     return (
       <div className="text-muted-foreground flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
-        {disc > 0.001 ? (
-          <span>
-            {t.orders.money.discount}: {formatMoney(disc)}
-          </span>
+        {hasDiscount(meta) && headline ? (
+          <span>{headline}</span>
         ) : null}
         <span>
           {t.orders.money.netTotal}: {formatMoney(money.order_total)}
@@ -52,6 +60,8 @@ export function OrderMoneySummary({
       <MoneyTotalsBreakdown
         subtotal={sub ?? money.order_total}
         discountAmount={disc}
+        discountType={discountType}
+        discountValue={discountValue}
         total={money.order_total}
         collected={money.collected_amount}
         remaining={money.remaining_amount}

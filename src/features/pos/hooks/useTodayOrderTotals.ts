@@ -64,6 +64,7 @@ export function useCollectionTotals(opts: {
   return {
     collectionStatusTotals,
     paymentMethodTotals,
+    trustCashTotal: totalsQuery.data?.trust_cash_total ?? null,
     totalCollected: totalsQuery.data?.total_collected ?? 0,
     scope: effectiveScope,
     setScope: (next: CollectionScope) => {
