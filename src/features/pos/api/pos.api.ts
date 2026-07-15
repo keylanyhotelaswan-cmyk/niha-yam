@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import { mapRpcError } from '@/shared/errors/rpc-error'
+import { parseDiscountPermissions } from '@/shared/access/discountPermissions'
 import { t } from '@/shared/i18n'
 import type {
   FinalizeSaleResult,
@@ -25,13 +26,17 @@ export async function fetchPosMenu(): Promise<PosMenu> {
 export async function fetchPosContext(): Promise<PosContext> {
   const { data, error } = await supabase.rpc('get_pos_context')
   if (error) throw wrap(error)
-  return (data as unknown as PosContext) ?? {
+  const raw = (data as unknown as PosContext) ?? {
     open_shift: null,
     payment_methods: [],
     operational_treasuries: [],
     can_discount: false,
     can_open_shift: false,
   }
+  if (raw.discount_permissions) {
+    raw.discount_permissions = parseDiscountPermissions(raw.discount_permissions)
+  }
+  return raw
 }
 
 export async function finalizeSale(input: {

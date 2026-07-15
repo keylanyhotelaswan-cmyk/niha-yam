@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase/client'
 import { t } from '@/shared/i18n'
+import { parseDiscountPermissions } from '@/shared/access/discountPermissions'
 import type { CreateStaffInput, StaffListItem } from '@/features/staff/types'
 
 type StaffErrorCode = keyof typeof t.staff.errors
@@ -21,7 +22,13 @@ function rpcErrorMessage(message: string): string {
 export async function listStaff(): Promise<StaffListItem[]> {
   const { data, error } = await supabase.rpc('list_staff')
   if (error) throw error
-  return (data as StaffListItem[]) ?? []
+  const rows = (data as StaffListItem[]) ?? []
+  return rows.map((row) => ({
+    ...row,
+    discount_permissions: row.discount_permissions
+      ? parseDiscountPermissions(row.discount_permissions)
+      : null,
+  }))
 }
 
 export async function createStaffAccount(
@@ -56,11 +63,13 @@ export async function updateStaff(input: {
   displayName: string
   branchId: string
   role: string
+  discountPermissions?: import('@/shared/access/discountPermissions').DiscountPermissionConfig | null
 }): Promise<void> {
   const { error } = await supabase.rpc('update_staff', {
     p_staff_id: input.staffId,
     p_display_name: input.displayName,
     p_branch_assignments: [{ branch_id: input.branchId, role: input.role }],
+    p_discount_permissions: input.discountPermissions ?? null,
   })
   if (error) throw new Error(rpcErrorMessage(error.message))
 }

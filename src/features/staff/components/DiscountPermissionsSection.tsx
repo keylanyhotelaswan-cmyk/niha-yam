@@ -40,7 +40,19 @@ export function DiscountPermissionsSection({
         label={t.staff.form.discountManual}
         checked={value.manual}
         disabled={readOnly}
-        onChange={(manual) => patch({ manual })}
+        onChange={(manual) =>
+          patch(
+            manual
+              ? {
+                  manual: true,
+                  typeAmount: value.typeAmount || true,
+                  typePercent: value.typePercent || true,
+                  canEdit: value.canEdit || true,
+                  canRemove: value.canRemove || true,
+                }
+              : { manual: false },
+          )
+        }
       />
       <CheckboxRow
         label={t.staff.form.discountTypeAmount}

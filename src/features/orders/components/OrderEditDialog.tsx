@@ -155,7 +155,11 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
 
   const menu = menuQuery.data
   const canDiscount = Boolean(contextQuery.data?.can_discount)
-  const discountPermissions = resolveDiscountPermissions(canDiscount, roles)
+  const discountPermissions = resolveDiscountPermissions(
+    canDiscount,
+    roles,
+    contextQuery.data?.discount_permissions ?? null,
+  )
   const canEdit =
     detail.order.can_free_edit !== false &&
     !detail.money?.has_approved_collection

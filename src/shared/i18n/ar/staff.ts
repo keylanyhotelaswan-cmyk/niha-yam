@@ -45,7 +45,8 @@ export const staff = {
     updated: 'تم حفظ التعديلات',
     discountSection: 'الخصومات',
     discountSectionHint:
-      'الصلاحيات الحالية مرتبطة بالدور. التخصيص لكل موظف سيُفعَّل لاحقًا.',
+      'حدد صلاحيات الخصم لهذا الموظف. تُحفظ مع الموظف وتُطبَّق فورًا في نقطة البيع.',
+    discountTypeRequired: 'فعّل نوع خصم واحد على الأقل (مبلغ أو نسبة).',
     discountManual: 'السماح بالخصم اليدوي',
     discountTypeAmount: 'مبلغ ثابت',
     discountTypePercent: 'نسبة مئوية',

@@ -824,6 +824,7 @@ export function SellSessionDialog({
           lines={cart.lines}
           subtotal={cart.subtotal}
           canDiscount={ctx.can_discount}
+          discountPermissionsConfig={ctx.discount_permissions}
           paymentMethods={paymentMethods}
           orderMeta={orderMetaFromDraft(liveDraft())}
           onSuccess={(change) => {
@@ -845,6 +846,7 @@ export function SellSessionDialog({
           lines={cart.lines}
           subtotal={cart.subtotal}
           canDiscount={ctx.can_discount}
+          discountPermissionsConfig={ctx.discount_permissions}
           orderMeta={orderMetaFromDraft(liveDraft())}
           onSuccess={(reference) => {
             cart.clear()

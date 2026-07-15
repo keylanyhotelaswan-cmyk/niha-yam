@@ -49,6 +49,7 @@ type Props = {
   lines: CartLine[]
   subtotal: number
   canDiscount: boolean
+  discountPermissionsConfig?: DiscountPermissionConfig | null
   paymentMethods: PosPaymentMethod[]
   orderMeta?: PaymentOrderMeta
   onSuccess: (change: number, reference: string) => void
@@ -104,6 +105,7 @@ export function PaymentDialog({
   lines,
   subtotal,
   canDiscount,
+  discountPermissionsConfig,
   paymentMethods,
   orderMeta,
   onSuccess,
@@ -111,8 +113,9 @@ export function PaymentDialog({
   const { staff } = useSession()
   const roles = staff?.branches.map((b) => b.role) ?? []
   const discountPermissions = useMemo(
-    () => resolveDiscountPermissions(canDiscount, roles),
-    [canDiscount, roles],
+    () =>
+      resolveDiscountPermissions(canDiscount, roles, discountPermissionsConfig),
+    [canDiscount, roles, discountPermissionsConfig],
   )
 
   const methods = useMemo(

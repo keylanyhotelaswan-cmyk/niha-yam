@@ -31,6 +31,7 @@ type Props = {
   lines: CartLine[]
   subtotal: number
   canDiscount: boolean
+  discountPermissionsConfig?: import('@/shared/access/discountPermissions').DiscountPermissionConfig | null
   orderMeta: PaymentOrderMeta
   onSuccess: (reference: string) => void
 }
@@ -41,14 +42,16 @@ export function PayLaterCheckoutDialog({
   lines,
   subtotal,
   canDiscount,
+  discountPermissionsConfig,
   orderMeta,
   onSuccess,
 }: Props) {
   const { staff } = useSession()
   const roles = staff?.branches.map((b) => b.role) ?? []
   const discountPermissions = useMemo(
-    () => resolveDiscountPermissions(canDiscount, roles),
-    [canDiscount, roles],
+    () =>
+      resolveDiscountPermissions(canDiscount, roles, discountPermissionsConfig),
+    [canDiscount, roles, discountPermissionsConfig],
   )
 
   const [submitting, setSubmitting] = useState(false)

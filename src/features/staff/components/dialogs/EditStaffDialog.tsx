@@ -13,6 +13,8 @@ import {
 import type { StaffListItem, StaffRole } from '@/features/staff/types'
 import {
   DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE,
+  discountPermissionsToPayload,
+  parseDiscountPermissions,
   type DiscountPermissionConfig,
 } from '@/shared/access/discountPermissions'
 import { Alert, AlertDescription } from '@/shared/components/ui/alert'
@@ -36,6 +38,13 @@ type EditStaffDialogProps = {
   onOpenChange: (open: boolean) => void
 }
 
+function seedDiscountPerms(staff: StaffListItem, role: StaffRole): DiscountPermissionConfig {
+  return parseDiscountPermissions(
+    staff.discount_permissions,
+    role,
+  )
+}
+
 export function EditStaffDialog({
   staff,
   open,
@@ -53,23 +62,43 @@ export function EditStaffDialog({
 
   const watchedRole = form.watch('role')
   const [discountPerms, setDiscountPerms] = useState<DiscountPermissionConfig>(
-    DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[currentRole],
+    () => seedDiscountPerms(staff, currentRole),
   )
+  const [discountTouched, setDiscountTouched] = useState(false)
 
+  // Re-seed when the target staff row changes (dialog reused across rows).
   useEffect(() => {
-    setDiscountPerms(DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[watchedRole])
-  }, [watchedRole])
-
-  // Re-seed when the target changes (dialog reused across rows).
-  useEffect(() => {
-    form.reset({ displayName: staff.display_name, role: currentRole })
+    const role = staff.branches[0]?.role ?? 'cashier'
+    form.reset({ displayName: staff.display_name, role })
+    setDiscountPerms(seedDiscountPerms(staff, role))
+    setDiscountTouched(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staff.id])
+  }, [staff.id, staff.discount_permissions, staff.display_name, open])
+
+  // If role changes and user hasn't customized discount yet, show role defaults.
+  useEffect(() => {
+    if (discountTouched) return
+    if (staff.discount_permissions) return
+    setDiscountPerms(DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[watchedRole])
+  }, [watchedRole, discountTouched, staff.discount_permissions])
+
+  function onDiscountChange(next: DiscountPermissionConfig) {
+    setDiscountTouched(true)
+    setDiscountPerms(next)
+  }
 
   function onSubmit(values: EditStaffFormValues) {
     const branchId = branchesQuery.data?.[0]?.id
     if (!branchId) {
       toast.error(t.staff.errors.generic)
+      return
+    }
+    if (
+      discountPerms.manual &&
+      !discountPerms.typeAmount &&
+      !discountPerms.typePercent
+    ) {
+      toast.error(t.staff.form.discountTypeRequired)
       return
     }
     updateMutation.mutate(
@@ -78,6 +107,7 @@ export function EditStaffDialog({
         displayName: values.displayName,
         branchId,
         role: values.role,
+        discountPermissions: discountPermissionsToPayload(discountPerms),
       },
       {
         onSuccess: () => {
@@ -93,7 +123,7 @@ export function EditStaffDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t.staff.form.editTitle}</DialogTitle>
           <DialogDescription>{t.staff.form.editDescription}</DialogDescription>
@@ -150,8 +180,7 @@ export function EditStaffDialog({
           <DiscountPermissionsSection
             role={watchedRole}
             value={discountPerms}
-            onChange={setDiscountPerms}
-            readOnly
+            onChange={onDiscountChange}
           />
 
           {branchesQuery.isError ? (

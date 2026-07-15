@@ -10,6 +10,7 @@ export type StaffListItem = {
   is_active: boolean
   branches: StaffBranchAssignment[]
   created_at: string
+  discount_permissions?: import('@/shared/access/discountPermissions').DiscountPermissionConfig | null
 }
 
 export type CreateStaffInput = {

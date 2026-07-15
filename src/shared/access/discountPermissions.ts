@@ -10,8 +10,7 @@ export type DiscountPayload = {
 } | null
 
 /**
- * Discount capability config — preparatory for per-staff overrides (ADR-0012).
- * Today resolved from role + server `can_discount`; UI mirrors this in staff dialogs.
+ * Discount capability config — role defaults + optional per-staff override (ADR-0012 path).
  */
 export type DiscountPermissionConfig = {
   manual: boolean
@@ -23,7 +22,7 @@ export type DiscountPermissionConfig = {
   canRemove: boolean
 }
 
-const NONE: DiscountPermissionConfig = {
+export const NONE_DISCOUNT_PERMISSIONS: DiscountPermissionConfig = {
   manual: false,
   typeAmount: false,
   typePercent: false,
@@ -33,7 +32,7 @@ const NONE: DiscountPermissionConfig = {
   canRemove: false,
 }
 
-const FULL: DiscountPermissionConfig = {
+export const FULL_DISCOUNT_PERMISSIONS: DiscountPermissionConfig = {
   manual: true,
   typeAmount: true,
   typePercent: true,
@@ -43,24 +42,71 @@ const FULL: DiscountPermissionConfig = {
   canRemove: true,
 }
 
-/** Role defaults until per-user overrides ship. */
+/** Role defaults when staff.discount_permissions is NULL. */
 export const DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE: Record<
   StaffRole,
   DiscountPermissionConfig
 > = {
-  owner: FULL,
-  manager: FULL,
-  cashier: NONE,
-  remote_operator: NONE,
-  waiter: NONE,
-  kitchen: NONE,
+  owner: FULL_DISCOUNT_PERMISSIONS,
+  manager: FULL_DISCOUNT_PERMISSIONS,
+  cashier: NONE_DISCOUNT_PERMISSIONS,
+  remote_operator: NONE_DISCOUNT_PERMISSIONS,
+  waiter: NONE_DISCOUNT_PERMISSIONS,
+  kitchen: NONE_DISCOUNT_PERMISSIONS,
+}
+
+export function parseDiscountPermissions(
+  raw: unknown,
+  fallbackRole?: StaffRole | null,
+): DiscountPermissionConfig {
+  if (raw && typeof raw === 'object') {
+    const r = raw as Record<string, unknown>
+    return {
+      manual: Boolean(r.manual),
+      typeAmount: Boolean(r.typeAmount),
+      typePercent: Boolean(r.typePercent),
+      maxAmount:
+        r.maxAmount === null || r.maxAmount === undefined || r.maxAmount === ''
+          ? null
+          : Number(r.maxAmount),
+      maxPercent:
+        r.maxPercent === null || r.maxPercent === undefined || r.maxPercent === ''
+          ? null
+          : Number(r.maxPercent),
+      canEdit: Boolean(r.canEdit),
+      canRemove: Boolean(r.canRemove),
+    }
+  }
+  return DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[fallbackRole ?? 'cashier']
+}
+
+export function discountPermissionsToPayload(
+  config: DiscountPermissionConfig,
+): DiscountPermissionConfig {
+  return {
+    manual: Boolean(config.manual),
+    typeAmount: Boolean(config.typeAmount),
+    typePercent: Boolean(config.typePercent),
+    maxAmount:
+      config.maxAmount != null && Number.isFinite(config.maxAmount)
+        ? Number(config.maxAmount)
+        : null,
+    maxPercent:
+      config.maxPercent != null && Number.isFinite(config.maxPercent)
+        ? Number(config.maxPercent)
+        : null,
+    canEdit: Boolean(config.canEdit),
+    canRemove: Boolean(config.canRemove),
+  }
 }
 
 export function resolveDiscountPermissions(
   canDiscount: boolean,
   roles: readonly StaffRole[],
+  stored?: DiscountPermissionConfig | null,
 ): DiscountPermissionConfig {
-  if (!canDiscount) return NONE
+  if (stored) return stored
+  if (!canDiscount) return NONE_DISCOUNT_PERMISSIONS
   const role = primaryStaffRole(roles)
   return DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[role ?? 'cashier']
 }

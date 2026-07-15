@@ -74,6 +74,8 @@ export type PosContext = {
   operational_treasuries: PosOperationalTreasury[]
   operational_drawer_balance?: number | null
   can_discount: boolean
+  /** Full discount capability (role default or per-staff override). */
+  discount_permissions?: import('@/shared/access/discountPermissions').DiscountPermissionConfig | null
   can_open_shift: boolean
   can_close_shift?: boolean
   can_approve_collections?: boolean
