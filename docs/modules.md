@@ -23,7 +23,7 @@ switches from invite links to direct creation (ADR-0018).
 > **Operational Polish v1.2** ✅ · [plan](./operational-polish-v1.2-plan.md) · [final review](./operational-polish-v1.2-final-review.md) · **Operational Freeze (final)** · Feedback Center + Arabic cashier UX.  
 > **Official Baseline:** [NIHA ERP Operational v1.1](./release-operational-v1.1.md) · tag `v1.1.0-production` · App **1.1.0** · Bridge **0.3.13**.  
 > Ops area: **bug / perf / simple UX only** — no new ops features.  
-> **Next capability:** **Suppliers & Purchasing** — [plan draft](./suppliers-purchasing-plan.md) (Review → Approve; no Implement yet).  
+> **Next capability:** **Suppliers & Purchasing** — [plan Approved 1.0](./suppliers-purchasing-plan.md) (2026-07-15) · Implement gated on PURA kickoff on Testing.  
 > **M7 KDS** remains deferred until paper workflow needs a screen.
 
 | #      | Module                           | Scope summary                                                                                                                                                                                                            | Depends on | Status                                                                     |
@@ -52,7 +52,7 @@ Governed by [NIHA ERP Vision 2.0](./niha-erp-vision-2.0.md) · [ADR-0033](./adr/
 | Inventory — **INVA** | [plan](./inventory-plan.md) · [INVA final review](./inventory-final-review-inva.md) | ✅ **INVA Approved (2026-07-12)** · `test:inventory` 20/20 · **Inventory Feature Freeze (INVA)** |
 | Inventory — **INVB** | — | ⏸ Blocked — spine candidate; **not** auto-next if live ops prioritize Purchasing |
 | Inventory — **INVC** | — | ⏸ After INVB (if counts land before consumption) |
-| Suppliers & Purchasing | [plan draft](./suppliers-purchasing-plan.md) | 📝 **Plan Draft** (2026-07-13) — Review → Approve; Implement blocked; freezes intact |
+| Suppliers & Purchasing | [plan](./suppliers-purchasing-plan.md) | ✅ **Plan Approved 1.0** (2026-07-15) · Q-PUR locked · Implement ⏸ until PURA kickoff on Testing · freezes intact |
 | Payroll & HR | — | ⏳ |
 | Promotions | — | ⏳ |
 | AI Operating Assistant | — | ⏳ |

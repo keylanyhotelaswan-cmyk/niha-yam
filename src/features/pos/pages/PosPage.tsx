@@ -37,6 +37,7 @@ import { posKeys } from '@/features/pos/hooks/pos.keys'
 import { usePosContext } from '@/features/pos/hooks/usePosQueries'
 import { useCollectionTotals } from '@/features/pos/hooks/useTodayOrderTotals'
 import { usePermissions } from '@/shared/access/permissions'
+import { useSession } from '@/shared/session/SessionProvider'
 import {
   createEmptyDraft,
   draftHasWork,
@@ -65,6 +66,7 @@ type HubFilter =
   | 'takeaway'
   | 'delivery'
   | 'ready'
+  | 'cancelled'
 
 /** Primary — action queue first (SHB). */
 const PRIMARY_FILTERS: HubFilter[] = ['action', 'unpaid', 'partial', 'needsReview']
@@ -81,6 +83,9 @@ const SECONDARY_FILTERS: HubFilter[] = [
 ]
 
 const FILTERS: HubFilter[] = [...PRIMARY_FILTERS, ...SECONDARY_FILTERS]
+
+/** Manager-only archive tab — cancelled stay out of cashier active queues. */
+const MANAGER_ONLY_FILTERS: HubFilter[] = ['cancelled']
 
 /** Cards per page — fits viewport without scrolling the hub grid. */
 const PAGE_SIZE = 6
@@ -99,6 +104,13 @@ function paymentBadge(p: OrderListItem['payment_status']) {
 }
 
 function cardChrome(order: OrderListItem) {
+  if (order.fulfillment_status === 'cancelled') {
+    return {
+      border: 'border-[#94a3b8]',
+      header: 'bg-[#f1f5f9] text-[#475569]',
+      label: t.orders.hub.filters.cancelled,
+    }
+  }
   if (order.requires_review) {
     return {
       border: 'border-[#f97316]',
@@ -140,6 +152,12 @@ function typeLabel(type: OrderListItem['order_type']) {
 }
 
 function matchesFilter(order: OrderListItem, filter: HubFilter): boolean {
+  if (filter === 'cancelled') {
+    return order.fulfillment_status === 'cancelled'
+  }
+  // Cancelled never belong in cashier active / operational filters.
+  if (order.fulfillment_status === 'cancelled') return false
+
   switch (filter) {
     case 'action':
       return (
@@ -176,10 +194,27 @@ export function PosPage() {
   const contextQuery = usePosContext()
   const ctx = contextQuery.data
   const [searchParams, setSearchParams] = useSearchParams()
+  const { isManager } = useSession()
+
+  const allowedFilters = useMemo(
+    () =>
+      isManager ? [...FILTERS, ...MANAGER_ONLY_FILTERS] : FILTERS,
+    [isManager],
+  )
+  const secondaryFilters = useMemo(
+    () =>
+      isManager
+        ? [...SECONDARY_FILTERS, ...MANAGER_ONLY_FILTERS]
+        : SECONDARY_FILTERS,
+    [isManager],
+  )
 
   const filterParam = searchParams.get('filter') as HubFilter | null
   const activeFilter: HubFilter =
-    filterParam && FILTERS.includes(filterParam) ? filterParam : 'action'
+    filterParam && allowedFilters.includes(filterParam)
+      ? filterParam
+      : 'action'
+  const viewingCancelled = activeFilter === 'cancelled'
 
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
@@ -205,18 +240,52 @@ export function PosPage() {
     else setFeedbackLink(null, null)
   }, [detailId, nav, setFeedbackLink, shiftId])
 
+  // Non-managers cannot stay on the cancelled archive tab.
+  useEffect(() => {
+    if (!isManager && filterParam === 'cancelled') {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('filter', 'action')
+          return next
+        },
+        { replace: true },
+      )
+    }
+  }, [isManager, filterParam, setSearchParams])
+
   const ordersQuery = useQuery({
-    queryKey: ['orders', 'list', search, shiftId],
+    queryKey: [
+      'orders',
+      'list',
+      search,
+      shiftId,
+      viewingCancelled ? 'cancelled' : 'active',
+    ],
     queryFn: () =>
       fetchOrdersForPos({
         search: search || undefined,
         shiftId: shiftId ?? undefined,
         // With an open shift: show ALL shift orders (any cashier). hubOnly hides
         // paid+completed tickets and looked like "orders disappeared" after user switch.
-        hubOnly: !shiftId,
+        // Cancelled archive always lists cancelled only (not hub-action queue).
+        hubOnly: viewingCancelled ? false : !shiftId,
+        fulfillmentStatus: viewingCancelled ? 'cancelled' : undefined,
       }),
     refetchInterval: 30_000,
     enabled: true,
+  })
+
+  const cancelledCountQuery = useQuery({
+    queryKey: ['orders', 'cancelled-count', shiftId],
+    queryFn: () =>
+      fetchOrdersForPos({
+        shiftId: shiftId ?? undefined,
+        hubOnly: false,
+        fulfillmentStatus: 'cancelled',
+      }),
+    refetchInterval: 30_000,
+    enabled: isManager && !viewingCancelled,
   })
   const {
     collectionStatusTotals,
@@ -230,7 +299,7 @@ export function PosPage() {
     allowDayScope: allowDayTotals,
   })
 
-  /** Hub strips: cash from shift collections; digital cards from operational treasuries (incl. transfers). */
+  /** Hub strips: cash = drawer balance (sales − transfers − expenses); digital = operational treasuries. */
   const paymentStripRows = useMemo(() => {
     const rows: Array<{
       payment_method_id?: string
@@ -238,9 +307,33 @@ export function PosPage() {
       name?: string
       amount: number
     }> = []
-    for (const r of collectionPaymentTotals) {
-      if (r.code === 'cash') rows.push(r)
+
+    const drawerTreasury = (ctx?.operational_treasuries ?? []).find(
+      (tr) => tr.code === 'drawer',
+    )
+    const drawerBalance =
+      drawerTreasury != null
+        ? Number(drawerTreasury.balance ?? 0)
+        : ctx?.operational_drawer_balance != null
+          ? Number(ctx.operational_drawer_balance)
+          : null
+
+    if (drawerBalance != null) {
+      // Always show cash while a shift is open so transfers/expenses visibly reduce the total.
+      if (shiftId || Math.abs(drawerBalance) > 0.001) {
+        rows.push({
+          payment_method_id: drawerTreasury?.id,
+          code: 'cash',
+          name: t.orders.paymentMethods.cash,
+          amount: drawerBalance,
+        })
+      }
+    } else {
+      for (const r of collectionPaymentTotals) {
+        if (r.code === 'cash') rows.push(r)
+      }
     }
+
     for (const tr of ctx?.operational_treasuries ?? []) {
       if (tr.code === 'drawer') continue
       const amount = Number(tr.balance ?? 0)
@@ -260,7 +353,63 @@ export function PosPage() {
       rows.push(r)
     }
     return rows
-  }, [collectionPaymentTotals, ctx?.operational_treasuries])
+  }, [
+    collectionPaymentTotals,
+    ctx?.operational_treasuries,
+    ctx?.operational_drawer_balance,
+    shiftId,
+  ])
+
+  const netCashAmount = useMemo(() => {
+    const drawerTreasury = (ctx?.operational_treasuries ?? []).find(
+      (tr) => tr.code === 'drawer',
+    )
+    if (drawerTreasury != null) return Number(drawerTreasury.balance ?? 0)
+    if (ctx?.operational_drawer_balance != null) {
+      return Number(ctx.operational_drawer_balance)
+    }
+    return (
+      collectionPaymentTotals.find((r) => r.code === 'cash')?.amount ?? 0
+    )
+  }, [
+    ctx?.operational_treasuries,
+    ctx?.operational_drawer_balance,
+    collectionPaymentTotals,
+  ])
+
+  const moneyStatusCards = useMemo(() => {
+    const paid = Number(collectionStatusTotals?.paid ?? 0)
+    const unpaid = Number(collectionStatusTotals?.unpaid ?? 0)
+    const partial = Number(collectionStatusTotals?.partial ?? 0)
+    return [
+      {
+        key: 'netCash' as const,
+        label: t.pos.hub.money.netCash,
+        amount: netCashAmount,
+        tone: 'bg-[#dcfce7] text-[#15803d]',
+        filter: null,
+      },
+      {
+        key: 'collected' as const,
+        label: t.pos.hub.money.collected,
+        amount: paid,
+        tone: 'bg-[#dcfce7] text-[#15803d]',
+        filter: 'paid' as HubFilter,
+      },
+      {
+        key: 'uncollected' as const,
+        label: t.pos.hub.money.uncollected,
+        amount: unpaid + partial,
+        tone: 'bg-[#fffbeb] text-[#b45309]',
+        filter: unpaid >= partial ? ('unpaid' as HubFilter) : ('partial' as HubFilter),
+      },
+    ]
+  }, [collectionStatusTotals, netCashAmount])
+
+  const digitalStripRows = useMemo(
+    () => paymentStripRows.filter((r) => r.code !== 'cash'),
+    [paymentStripRows],
+  )
 
   useEffect(() => {
     saveHeldDrafts(held)
@@ -287,8 +436,19 @@ export function PosPage() {
       if (f === 'held') result[f] = held.length
       else result[f] = list.filter((o) => matchesFilter(o, f)).length
     }
+    if (isManager) {
+      result.cancelled = viewingCancelled
+        ? list.filter((o) => matchesFilter(o, 'cancelled')).length
+        : (cancelledCountQuery.data ?? []).length
+    }
     return result
-  }, [ordersQuery.data, held.length])
+  }, [
+    ordersQuery.data,
+    held.length,
+    isManager,
+    viewingCancelled,
+    cancelledCountQuery.data,
+  ])
 
   const listForPage = activeFilter === 'held' ? held : orders
   const totalPages = Math.max(1, Math.ceil(listForPage.length / PAGE_SIZE))
@@ -305,8 +465,8 @@ export function PosPage() {
 
   function setFilter(next: HubFilter) {
     setPage(1)
-    if (next === 'all') setSearchParams({})
-    else setSearchParams({ filter: next })
+    // Keep filter=all in the URL — clearing params falls back to 'action' by default.
+    setSearchParams({ filter: next })
   }
 
   /** If there's an unfinished active draft, park it before starting another. */
@@ -436,101 +596,74 @@ export function PosPage() {
 
         {activeFilter !== 'held' ? (
           <div className="shrink-0 space-y-1.5 px-4 pb-1.5">
-            <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
-              {(
-                [
-                  {
-                    key: 'all' as const,
-                    label: t.pos.hub.kpis.orders,
-                    tone: 'bg-white text-[#0f172a]',
-                  },
-                  {
-                    key: 'unpaid' as const,
-                    label: t.pos.hub.kpis.unpaid,
-                    tone: 'bg-[#fef9c3] text-[#a16207]',
-                  },
-                  {
-                    key: 'partial' as const,
-                    label: t.pos.hub.kpis.partial,
-                    tone: 'bg-[#eff6ff] text-[#2563eb]',
-                  },
-                  {
-                    key: 'needsReview' as const,
-                    label: t.pos.hub.kpis.review,
-                    tone: 'bg-[#fff7ed] text-[#c2410c]',
-                  },
-                  {
-                    key: 'delivery' as const,
-                    label: t.pos.hub.kpis.delivery,
-                    tone: 'bg-[#fff7ed] text-[#c2410c]',
-                  },
-                  {
-                    key: 'dine_in' as const,
-                    label: t.pos.hub.kpis.dineIn,
-                    tone: 'bg-[#eff6ff] text-[#2563eb]',
-                  },
-                  {
-                    key: 'ready' as const,
-                    label: t.pos.hub.kpis.ready,
-                    tone: 'bg-[#dcfce7] text-[#15803d]',
-                  },
-                ] as const
-              ).map((kpi) => (
-                <button
-                  key={kpi.key}
-                  type="button"
-                  onClick={() => setFilter(kpi.key)}
-                  className={cn(
-                    'rounded-xl border border-white px-2 py-2 text-center shadow-[0_2px_8px_rgba(15,23,42,0.04)]',
-                    kpi.tone,
-                    activeFilter === kpi.key && 'ring-2 ring-[#93c5fd]',
-                  )}
-                >
-                  <p className="text-[10px] font-semibold opacity-80">
-                    {kpi.label}
-                  </p>
-                  <p className="text-base font-bold">{counts[kpi.key]}</p>
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap items-center gap-2 rounded-xl border border-white/80 bg-white px-2.5 py-1.5 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
-              <span className="text-[10px] font-semibold text-[#94a3b8]">
-                {collectionScope === 'shift'
-                  ? t.orders.paymentMethods.shiftTotals
-                  : t.orders.paymentMethods.dayTotals}
-              </span>
-              {canToggleDay && shiftId ? (
-                <div className="flex items-center gap-0.5 rounded-md border border-[#e2e8f0] p-0.5">
+            <div className="space-y-1.5 rounded-xl border border-white/80 bg-white px-2.5 py-2 shadow-[0_2px_10px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-semibold text-[#94a3b8]">
+                  {collectionScope === 'shift'
+                    ? t.orders.paymentMethods.shiftTotals
+                    : t.orders.paymentMethods.dayTotals}
+                </span>
+                {canToggleDay && shiftId ? (
+                  <div className="flex items-center gap-0.5 rounded-md border border-[#e2e8f0] p-0.5">
+                    <button
+                      type="button"
+                      className={cn(
+                        'rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                        collectionScope === 'shift'
+                          ? 'bg-[#eff6ff] text-[#2563eb]'
+                          : 'text-[#94a3b8]',
+                      )}
+                      onClick={() => setCollectionScope('shift')}
+                    >
+                      {t.orders.paymentMethods.scopeShift}
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        'rounded px-1.5 py-0.5 text-[10px] font-semibold',
+                        collectionScope === 'day'
+                          ? 'bg-[#eff6ff] text-[#2563eb]'
+                          : 'text-[#94a3b8]',
+                      )}
+                      onClick={() => setCollectionScope('day')}
+                    >
+                      {t.orders.paymentMethods.scopeDay}
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {moneyStatusCards.map((card) => (
                   <button
+                    key={card.key}
                     type="button"
+                    disabled={!card.filter}
+                    onClick={() => {
+                      if (card.filter) setFilter(card.filter)
+                    }}
                     className={cn(
-                      'rounded px-1.5 py-0.5 text-[10px] font-semibold',
-                      collectionScope === 'shift'
-                        ? 'bg-[#eff6ff] text-[#2563eb]'
-                        : 'text-[#94a3b8]',
+                      'rounded-xl px-2 py-2 text-center transition-shadow',
+                      card.tone,
+                      card.filter &&
+                        activeFilter === card.filter &&
+                        'ring-2 ring-[#93c5fd]',
+                      card.filter
+                        ? 'cursor-pointer hover:shadow-sm'
+                        : 'cursor-default',
                     )}
-                    onClick={() => setCollectionScope('shift')}
                   >
-                    {t.orders.paymentMethods.scopeShift}
+                    <p className="text-[10px] font-semibold opacity-80">
+                      {card.label}
+                    </p>
+                    <p className="mt-0.5 text-sm font-bold sm:text-base" dir="ltr">
+                      {formatMoney(card.amount)}
+                    </p>
                   </button>
-                  <button
-                    type="button"
-                    className={cn(
-                      'rounded px-1.5 py-0.5 text-[10px] font-semibold',
-                      collectionScope === 'day'
-                        ? 'bg-[#eff6ff] text-[#2563eb]'
-                        : 'text-[#94a3b8]',
-                    )}
-                    onClick={() => setCollectionScope('day')}
-                  >
-                    {t.orders.paymentMethods.scopeDay}
-                  </button>
-                </div>
+                ))}
+              </div>
+              {digitalStripRows.length > 0 ? (
+                <PaymentMethodTotalsStrip rows={digitalStripRows} compact />
               ) : null}
-              <PaymentMethodTotalsStrip
-                rows={paymentStripRows}
-                compact
-              />
             </div>
           </div>
         ) : null}
@@ -566,7 +699,7 @@ export function PosPage() {
                 )
               })}
               <span className="mx-0.5 h-4 w-px bg-[#e2e8f0]" aria-hidden />
-              {SECONDARY_FILTERS.map((f) => {
+              {secondaryFilters.map((f) => {
                 const active = activeFilter === f
                 const label =
                   f === 'held'
@@ -575,9 +708,11 @@ export function PosPage() {
                       ? t.pos.create.types.dine_in
                       : f === 'needsReview'
                         ? t.orders.hub.filters.needsReview
-                        : t.orders.hub.filters[
-                            f as keyof typeof t.orders.hub.filters
-                          ]
+                        : f === 'cancelled'
+                          ? t.orders.hub.filters.cancelled
+                          : t.orders.hub.filters[
+                              f as keyof typeof t.orders.hub.filters
+                            ]
                 return (
                   <button
                     key={f}
@@ -586,12 +721,14 @@ export function PosPage() {
                     className={cn(
                       'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold transition-all',
                       active
-                        ? 'border-[#93c5fd] bg-[#eff6ff] text-[#2563eb]'
+                        ? f === 'cancelled'
+                          ? 'border-[#cbd5e1] bg-[#f1f5f9] text-[#475569]'
+                          : 'border-[#93c5fd] bg-[#eff6ff] text-[#2563eb]'
                         : 'border-transparent bg-transparent text-[#94a3b8] hover:bg-[#f8fafc]',
                     )}
                   >
                     {label}
-                    <span>{counts[f]}</span>
+                    <span>{counts[f] ?? 0}</span>
                   </button>
                 )
               })}

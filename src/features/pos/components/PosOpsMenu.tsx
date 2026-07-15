@@ -64,6 +64,7 @@ export function PosOpsMenu({
 
   function refreshContext() {
     void queryClient.invalidateQueries({ queryKey: posKeys.context() })
+    void queryClient.invalidateQueries({ queryKey: ['collection-totals'] })
   }
 
   function closeMenu() {
@@ -197,10 +198,7 @@ export function PosOpsMenu({
         shiftId={shift?.id ?? null}
         onOpenChange={(next) => {
           setTransferOpen(next)
-          if (!next) {
-            refreshContext()
-            void queryClient.invalidateQueries({ queryKey: ['collection-totals'] })
-          }
+          if (!next) refreshContext()
         }}
       />
 

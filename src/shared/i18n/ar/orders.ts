@@ -26,11 +26,12 @@ export const orders = {
     editOrder: 'تعديل الطلب',
     cancelOrder: 'إلغاء الطلب',
     cancelTitle: 'إلغاء الطلب',
-    cancelHint: 'يُسجَّل الإلغاء في السجل — لا يُحذف الطلب نهائيًا.',
+    cancelHint:
+      'يُزال الطلب من قائمة الكاشير النشطة ويبقى في السجل والتقارير. إن كان قد أُرسل للمطبخ تُرسل تذكرة إلغاء للمطبخ.',
     cancelReason: 'سبب الإلغاء',
     cancelReasonPlaceholder: 'مثال: طلب العميل / خطأ في الطلب',
     cancelConfirm: 'تأكيد الإلغاء',
-    cancelDone: 'تم إلغاء الطلب.',
+    cancelDone: 'تم إلغاء الطلب وإزالته من قائمة التشغيل.',
     cancelBlocked: 'لا يمكن إلغاء هذا الطلب في حالته الحالية.',
     cancelReasons: {
       ALREADY_CANCELLED: 'الطلب ملغى بالفعل.',
@@ -64,6 +65,7 @@ export const orders = {
       delivery: 'دليفري',
       takeaway: 'استلام',
       ready: 'جاهز',
+      cancelled: 'ملغاة',
       customers: 'عملاء اليوم',
     },
     identity: {

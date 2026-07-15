@@ -143,6 +143,11 @@ export const pos = {
       dineIn: 'داخل المطعم',
       ready: 'جاهز',
     },
+    money: {
+      netCash: 'نقدي صافي',
+      collected: 'محصل',
+      uncollected: 'غير محصل',
+    },
     cardStatus: {
       paid: 'محصل',
       unpaid: 'غير محصل',

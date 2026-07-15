@@ -6,6 +6,12 @@
   "packageManager": "pnpm@9.15.9",
   "scripts": {
     "dev": "vite",
+    "dev:testing": "vite --mode testing --port 5174 --strictPort",
+    "migrate:production": "node scripts/migrate-production.mjs",
+    "migrate:testing": "node scripts/migrate-testing.mjs",
+    "migrate:schema": "node scripts/migrate-schema.mjs",
+    "seed:testing": "node scripts/seed-testing.mjs",
+    "env:testing": "node scripts/write-testing-env.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "lint:tokens": "node scripts/lint-tokens.mjs",

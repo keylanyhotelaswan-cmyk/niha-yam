@@ -37,6 +37,34 @@ export function loadProjectEnv(cwd = process.cwd()) {
   return loadEnvFile(resolve(cwd, '.env.local'))
 }
 
+/** Testing env — never falls back to production `.env.local`. */
+export function loadTestingEnv(cwd = process.cwd()) {
+  return loadEnvFile(resolve(cwd, '.env.testing'))
+}
+
+export const PRODUCTION_SUPABASE_REF = 'nzwgoavyrshuypkugvzc'
+export const TESTING_SUPABASE_REF = 'xywgmolpnhimivwmsmpw'
+
+export function assertTestingTarget(url, label = 'VITE_SUPABASE_URL') {
+  assertSupabaseUrl(url, label)
+  let host
+  try {
+    host = new URL(url).hostname
+  } catch {
+    throw new Error(`Invalid ${label}`)
+  }
+  if (!host.startsWith(`${TESTING_SUPABASE_REF}.`)) {
+    throw new Error(
+      `Refusing to run: ${label} is not the Testing project (${TESTING_SUPABASE_REF}). Got ${host}`,
+    )
+  }
+  if (host.includes(PRODUCTION_SUPABASE_REF)) {
+    throw new Error(
+      `Refusing to run: ${label} points at Production (${PRODUCTION_SUPABASE_REF}).`,
+    )
+  }
+}
+
 const SUPABASE_URL_PATTERN = /^https?:\/\/[^/\s]+/i
 
 export function assertSupabaseUrl(url, label = 'VITE_SUPABASE_URL') {
