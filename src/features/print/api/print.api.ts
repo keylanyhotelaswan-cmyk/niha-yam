@@ -196,6 +196,12 @@ export async function getPrintOpsSettings(): Promise<PrintOpsSettings> {
 }
 
 export async function bootstrapTestPrintEnvironment(): Promise<PrintOpsSettings> {
+  // Hotfix guard: never mark Production Supabase as a test print environment.
+  // (Accidental bootstrap + testing_print_enabled=OFF blocks claim_print_jobs.)
+  const url = import.meta.env.VITE_SUPABASE_URL ?? ''
+  if (url.includes('nzwgoavyrshuypkugvzc')) {
+    return getPrintOpsSettings()
+  }
   const { data, error } = await rpc('m6_bootstrap_test_print_environment')
   if (error) throw wrap(error)
   return data as PrintOpsSettings

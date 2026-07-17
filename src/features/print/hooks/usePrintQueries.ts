@@ -77,13 +77,7 @@ export function usePrintOpsSettings() {
   return useQuery({
     queryKey: printKeys.ops(),
     enabled: isTestingEnv(),
-    queryFn: async () => {
-      try {
-        return await api.bootstrapTestPrintEnvironment()
-      } catch {
-        return await api.getPrintOpsSettings()
-      }
-    },
+    queryFn: () => api.getPrintOpsSettings(),
     refetchInterval: 20_000,
   })
 }
