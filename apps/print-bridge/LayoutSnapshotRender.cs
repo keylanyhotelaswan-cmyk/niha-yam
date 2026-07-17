@@ -30,6 +30,8 @@ internal static class LayoutSnapshotRender
             var doc = new EscPosDocument(widthDots: layout.PaperWidthMm <= 58 ? 384 : 576);
             var cur = Str(snap, "currency_label") ?? "";
 
+            TestEnvBanner.Write(doc, job);
+
             if (root.TryGetProperty("reprint", out var rp) && rp.ValueKind == JsonValueKind.True)
                 doc.Line("★ إعادة طباعة ★", EscPosAlign.Center, fontSize: 15f, bold: true);
 

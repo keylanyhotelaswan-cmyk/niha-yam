@@ -9,6 +9,7 @@ import type {
   PrintJobRow,
   PrintPreview,
   PrintSettings,
+  PrintOpsSettings,
   PrintSystemDiagnosis,
   PrintTemplateRow,
   UpsertPrinterInput,
@@ -175,7 +176,39 @@ export async function enqueueTestPrint(printerId: string): Promise<string> {
 export async function diagnosePrintSystem(): Promise<PrintSystemDiagnosis> {
   const { data, error } = await rpc('diagnose_print_system')
   if (error) throw wrap(error)
-  return data as PrintSystemDiagnosis
+  const diagnosis = data as PrintSystemDiagnosis
+  try {
+    const ops = await getPrintOpsSettings()
+    const ready =
+      ops.is_test_environment && !ops.testing_print_enabled
+        ? false
+        : diagnosis.ready
+    return { ...diagnosis, ready, print_ops: ops }
+  } catch {
+    return diagnosis
+  }
+}
+
+export async function getPrintOpsSettings(): Promise<PrintOpsSettings> {
+  const { data, error } = await rpc('get_print_ops_settings')
+  if (error) throw wrap(error)
+  return data as PrintOpsSettings
+}
+
+export async function bootstrapTestPrintEnvironment(): Promise<PrintOpsSettings> {
+  const { data, error } = await rpc('m6_bootstrap_test_print_environment')
+  if (error) throw wrap(error)
+  return data as PrintOpsSettings
+}
+
+export async function setTestingPrintEnabled(
+  enabled: boolean,
+): Promise<PrintOpsSettings> {
+  const { data, error } = await rpc('set_testing_print_enabled', {
+    p_enabled: enabled,
+  })
+  if (error) throw wrap(error)
+  return data as PrintOpsSettings
 }
 
 export async function syncPrintStationBindings(): Promise<{
@@ -185,8 +218,32 @@ export async function syncPrintStationBindings(): Promise<{
   bridge_id?: string
   reason?: string
   picked_windows_name?: string | null
+  needs_choice?: boolean
+  actions?: Array<{
+    printer_id: string
+    from: string | null
+    to: string | null
+    reason: string
+    score?: number
+    detail?: string
+  }>
 }> {
   const { data, error } = await rpc('sync_print_station_bindings')
+  if (error) throw wrap(error)
+  return (data as Record<string, unknown>) ?? {}
+}
+
+export async function chooseCashierWindowsPrinter(
+  windowsName: string,
+): Promise<{
+  ok?: boolean
+  reason?: string
+  windows_name?: string
+  reason_ar?: string
+}> {
+  const { data, error } = await rpc('choose_cashier_windows_printer', {
+    p_windows_name: windowsName,
+  })
   if (error) throw wrap(error)
   return (data as Record<string, unknown>) ?? {}
 }

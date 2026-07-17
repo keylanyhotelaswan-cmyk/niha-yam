@@ -54,6 +54,42 @@ export type BridgeDeviceRow = {
   is_virtual: boolean
   last_seen_at: string
   assigned_printer_id: string | null
+  driver_name?: string | null
+  port_name?: string | null
+  device_id?: string | null
+  is_default?: boolean
+}
+
+export type PrintRemapProposal = {
+  printer_id: string
+  printer_name: string
+  role: string
+  from: string | null
+  to: string | null
+  reason: string | null
+  score?: number | string | null
+  detail?: string | null
+  applied?: boolean
+  at?: string | null
+  needs_choice?: boolean
+  candidates?: Array<{ windows_name: string; is_default?: boolean }>
+}
+
+export type PrintSelectionStory = {
+  connected: boolean
+  bridge_version?: string | null
+  device_label?: string | null
+  active_printer?: string | null
+  previous_printer?: string | null
+  reason_code?: string | null
+  reason_ar: string
+  status_message_ar: string
+  last_remap_at?: string | null
+  last_remap_from?: string | null
+  last_remap_to?: string | null
+  needs_choice?: boolean
+  candidates?: Array<{ windows_name: string; is_default?: boolean }>
+  auto_applied?: boolean
 }
 
 export type PrintBridgeRow = {
@@ -210,11 +246,24 @@ export type PrintDiagnoseCheck = {
   ok: boolean
   label: string
   detail: string | null
+  from_name?: string | null
+  to_name?: string | null
+  reason?: string | null
+  score?: number | null
+  can_apply?: boolean
+}
+
+export type PrintOpsSettings = {
+  restaurant_id: string
+  is_test_environment: boolean
+  testing_print_enabled: boolean
+  updated_at: string
 }
 
 export type PrintSystemDiagnosis = {
   ready: boolean
   checked_at: string
+  selection?: PrintSelectionStory | null
   online_bridge: {
     id: string
     device_name: string | null
@@ -224,6 +273,7 @@ export type PrintSystemDiagnosis = {
     windows_username: string | null
   } | null
   checks: PrintDiagnoseCheck[]
+  remaps?: PrintRemapProposal[]
   pending_jobs: Array<{
     id: string
     reference: string
@@ -242,6 +292,9 @@ export type PrintSystemDiagnosis = {
     bridge_id: string | null
     windows_printer_name: string | null
     bridge_online: boolean
+    driver_name?: string | null
+    port_name?: string | null
+    last_remap?: Record<string, unknown> | null
   }>
   bridges: Array<{
     id: string
@@ -252,5 +305,7 @@ export type PrintSystemDiagnosis = {
     last_heartbeat_at: string | null
     device_count: number
   }>
+  /** Present when client merges get_print_ops_settings into diagnosis. */
+  print_ops?: PrintOpsSettings | null
 }
 

@@ -8,23 +8,26 @@ namespace Niha.PrintBridge;
 /// <summary>
 /// Thin Supabase RPC client for Bridge only (BP-10: no business logic).
 /// Auth: anon key + bridge token — never service_role.
+/// One instance per cloud connection (Production or Testing).
 /// </summary>
 public sealed class SupabaseBridgeApi
 {
     private readonly HttpClient _http;
-    private readonly BridgeConfig _cfg;
+    private readonly BridgeConnection _conn;
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNameCaseInsensitive = true,
     };
 
-    public SupabaseBridgeApi(BridgeConfig cfg)
+    public BridgeConnection Connection => _conn;
+
+    public SupabaseBridgeApi(BridgeConnection conn)
     {
-        _cfg = cfg;
-        _http = new HttpClient { BaseAddress = new Uri(cfg.SupabaseUrl.TrimEnd('/') + "/") };
-        _http.DefaultRequestHeaders.Add("apikey", cfg.AnonKey);
+        _conn = conn;
+        _http = new HttpClient { BaseAddress = new Uri(conn.SupabaseUrl.TrimEnd('/') + "/") };
+        _http.DefaultRequestHeaders.Add("apikey", conn.AnonKey);
         _http.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", cfg.AnonKey);
+            new AuthenticationHeaderValue("Bearer", conn.AnonKey);
     }
 
     public async Task<JsonElement> PairAsync(
@@ -55,10 +58,10 @@ public sealed class SupabaseBridgeApi
         EnsureToken();
         var body = new
         {
-            p_token = _cfg.BridgeToken,
+            p_token = _conn.BridgeToken,
             p_device_name = Environment.MachineName,
             p_windows_username = Environment.UserName,
-            p_version = typeof(SupabaseBridgeApi).Assembly.GetName().Version?.ToString() ?? "0.2.1",
+            p_version = typeof(SupabaseBridgeApi).Assembly.GetName().Version?.ToString() ?? "0.5.0",
             p_restarted = restarted,
         };
         using var res = await _http.PostAsJsonAsync("rest/v1/rpc/bridge_heartbeat", body, ct);
@@ -66,7 +69,6 @@ public sealed class SupabaseBridgeApi
         if (!res.IsSuccessStatusCode)
             throw new InvalidOperationException($"bridge_heartbeat failed: {text}");
 
-        // Prefer restaurant name from server (works for already-paired bridges)
         try
         {
             if (!string.IsNullOrWhiteSpace(text) && text != "null" && text.TrimStart().StartsWith('{'))
@@ -75,14 +77,14 @@ public sealed class SupabaseBridgeApi
                 if (doc.RootElement.TryGetProperty("restaurant_name", out var rn))
                 {
                     var name = rn.GetString();
-                    if (!string.IsNullOrWhiteSpace(name) &&
-                        !string.Equals(_cfg.RestaurantName, name, StringComparison.Ordinal))
-                    {
-                        _cfg.RestaurantName = name;
-                        if (doc.RootElement.TryGetProperty("restaurant_id", out var rid))
-                            _cfg.RestaurantId = rid.GetString();
-                        ConfigStore.Save(_cfg);
-                    }
+                    if (!string.IsNullOrWhiteSpace(name))
+                        _conn.RestaurantName = name;
+                }
+                if (doc.RootElement.TryGetProperty("restaurant_id", out var rid))
+                {
+                    var id = rid.GetString();
+                    if (!string.IsNullOrWhiteSpace(id))
+                        _conn.RestaurantId = id;
                 }
             }
         }
@@ -99,7 +101,7 @@ public sealed class SupabaseBridgeApi
         {
             p_bridge_id = (Guid?)null,
             p_limit = limit,
-            p_token = _cfg.BridgeToken,
+            p_token = _conn.BridgeToken,
         };
         using var res = await _http.PostAsJsonAsync("rest/v1/rpc/claim_print_jobs", body, ct);
         var text = await res.Content.ReadAsStringAsync(ct);
@@ -114,7 +116,7 @@ public sealed class SupabaseBridgeApi
     public async Task<string> DiagnoseClaimAsync(CancellationToken ct)
     {
         EnsureToken();
-        var body = new { p_token = _cfg.BridgeToken };
+        var body = new { p_token = _conn.BridgeToken };
         using var res = await _http.PostAsJsonAsync("rest/v1/rpc/diagnose_bridge_claim", body, ct);
         var text = await res.Content.ReadAsStringAsync(ct);
         if (!res.IsSuccessStatusCode)
@@ -138,7 +140,7 @@ public sealed class SupabaseBridgeApi
             ["p_error_code"] = errorCode,
             ["p_error_message"] = errorMessage,
             ["p_bridge_id"] = null,
-            ["p_token"] = _cfg.BridgeToken,
+            ["p_token"] = _conn.BridgeToken,
             ["p_delivery"] = delivery,
         };
         using var content = new StringContent(
@@ -147,7 +149,6 @@ public sealed class SupabaseBridgeApi
         if (!res.IsSuccessStatusCode)
         {
             var text = await res.Content.ReadAsStringAsync(ct);
-            // Duplicate ACK / already completed — treat as ok for idempotency
             if (text.Contains("INVALID_STATE", StringComparison.OrdinalIgnoreCase) && success)
                 return;
             throw new InvalidOperationException($"report_print_attempt failed: {text}");
@@ -155,14 +156,22 @@ public sealed class SupabaseBridgeApi
     }
 
     public async Task ReportPrintersAsync(
-        IEnumerable<(string Name, bool IsVirtual)> printers,
+        IEnumerable<WindowsPrinterInfo> printers,
         CancellationToken ct)
     {
         EnsureToken();
         var list = printers
-            .Select(p => new { name = p.Name, is_virtual = p.IsVirtual })
+            .Select(p => new
+            {
+                name = p.Name,
+                is_virtual = p.IsVirtual,
+                is_default = p.IsDefault,
+                driver_name = p.DriverName,
+                port_name = p.PortName,
+                device_id = p.DeviceId,
+            })
             .ToArray();
-        var body = new { p_token = _cfg.BridgeToken, p_printers = list };
+        var body = new { p_token = _conn.BridgeToken, p_printers = list };
         using var res = await _http.PostAsJsonAsync("rest/v1/rpc/report_bridge_printers", body, ct);
         if (!res.IsSuccessStatusCode)
         {
@@ -173,7 +182,7 @@ public sealed class SupabaseBridgeApi
 
     private void EnsureToken()
     {
-        if (string.IsNullOrWhiteSpace(_cfg.BridgeToken))
+        if (string.IsNullOrWhiteSpace(_conn.BridgeToken))
             throw new InvalidOperationException("Bridge not paired.");
     }
 }

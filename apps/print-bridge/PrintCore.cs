@@ -18,24 +18,44 @@ public sealed class OfflineStore : IDisposable
         cmd.CommandText =
             """
             CREATE TABLE IF NOT EXISTS pending_reports (
-              job_id TEXT PRIMARY KEY,
+              job_id TEXT NOT NULL,
               success INTEGER NOT NULL,
               error_code TEXT,
               error_message TEXT,
               delivery TEXT NOT NULL,
-              created_at TEXT NOT NULL
+              created_at TEXT NOT NULL,
+              connection_key TEXT NOT NULL DEFAULT '',
+              PRIMARY KEY (job_id, connection_key)
             );
             """;
         cmd.ExecuteNonQuery();
+        try
+        {
+            using var alter = _db.CreateCommand();
+            alter.CommandText =
+                "ALTER TABLE pending_reports ADD COLUMN connection_key TEXT NOT NULL DEFAULT '';";
+            alter.ExecuteNonQuery();
+        }
+        catch
+        {
+            // column already exists on upgraded installs
+        }
     }
 
-    public void EnqueueReport(Guid jobId, bool success, string? code, string? message, string delivery)
+    public void EnqueueReport(
+        Guid jobId,
+        bool success,
+        string? code,
+        string? message,
+        string delivery,
+        string? connectionKey = null)
     {
+        var key = connectionKey ?? "";
         using var cmd = _db.CreateCommand();
         cmd.CommandText =
             """
-            INSERT OR REPLACE INTO pending_reports(job_id, success, error_code, error_message, delivery, created_at)
-            VALUES ($id, $ok, $code, $msg, $del, $at);
+            INSERT OR REPLACE INTO pending_reports(job_id, success, error_code, error_message, delivery, created_at, connection_key)
+            VALUES ($id, $ok, $code, $msg, $del, $at, $ck);
             """;
         cmd.Parameters.AddWithValue("$id", jobId.ToString());
         cmd.Parameters.AddWithValue("$ok", success ? 1 : 0);
@@ -43,13 +63,32 @@ public sealed class OfflineStore : IDisposable
         cmd.Parameters.AddWithValue("$msg", (object?)message ?? DBNull.Value);
         cmd.Parameters.AddWithValue("$del", delivery);
         cmd.Parameters.AddWithValue("$at", DateTimeOffset.UtcNow.ToString("O"));
+        cmd.Parameters.AddWithValue("$ck", key);
         cmd.ExecuteNonQuery();
     }
 
-    public List<(Guid Id, bool Ok, string? Code, string? Msg, string Delivery)> ListPending()
+    public List<(Guid Id, bool Ok, string? Code, string? Msg, string Delivery)> ListPending(
+        string? connectionKey = null)
     {
         using var cmd = _db.CreateCommand();
-        cmd.CommandText = "SELECT job_id, success, error_code, error_message, delivery FROM pending_reports ORDER BY created_at;";
+        if (connectionKey is null)
+        {
+            cmd.CommandText =
+                "SELECT job_id, success, error_code, error_message, delivery FROM pending_reports ORDER BY created_at;";
+        }
+        else
+        {
+            cmd.CommandText =
+                """
+                SELECT job_id, success, error_code, error_message, delivery
+                FROM pending_reports
+                WHERE connection_key = $ck OR (connection_key = '' AND $ck <> '')
+                ORDER BY created_at;
+                """;
+            // Prefer exact key; also flush legacy rows (empty key) with the first connection.
+            cmd.Parameters.AddWithValue("$ck", connectionKey);
+        }
+
         using var r = cmd.ExecuteReader();
         var list = new List<(Guid, bool, string?, string?, string)>();
         while (r.Read())
@@ -64,11 +103,21 @@ public sealed class OfflineStore : IDisposable
         return list;
     }
 
-    public void Remove(Guid jobId)
+    public void Remove(Guid jobId, string? connectionKey = null)
     {
         using var cmd = _db.CreateCommand();
-        cmd.CommandText = "DELETE FROM pending_reports WHERE job_id = $id;";
-        cmd.Parameters.AddWithValue("$id", jobId.ToString());
+        if (connectionKey is null)
+        {
+            cmd.CommandText = "DELETE FROM pending_reports WHERE job_id = $id;";
+            cmd.Parameters.AddWithValue("$id", jobId.ToString());
+        }
+        else
+        {
+            cmd.CommandText =
+                "DELETE FROM pending_reports WHERE job_id = $id AND (connection_key = $ck OR connection_key = '');";
+            cmd.Parameters.AddWithValue("$id", jobId.ToString());
+            cmd.Parameters.AddWithValue("$ck", connectionKey);
+        }
         cmd.ExecuteNonQuery();
     }
 
@@ -96,6 +145,7 @@ public static class EscPosRenderer
             return fromSnapshot;
 
         var doc = new EscPosDocument(widthDots: job.Printer?.PaperWidthMm <= 58 ? 384 : 576);
+        TestEnvBanner.Write(doc, job);
         doc.Line(job.Kind?.ToUpperInvariant() ?? "PRINT", EscPosAlign.Center, bold: true);
         doc.Line(job.Reference ?? job.Id.ToString("N")[..8], EscPosAlign.Center);
         doc.Line(DateTime.Now.ToString("yyyy-MM-dd HH:mm"), EscPosAlign.Center, fontSize: 14f);
@@ -189,6 +239,7 @@ public static class EscPosRenderer
     {
         var width = job.Printer?.PaperWidthMm <= 58 ? 384 : 576;
         var doc = new EscPosDocument(widthDots: width);
+        TestEnvBanner.Write(doc, job);
         doc.Line("NIHA", EscPosAlign.Center, fontSize: 28f, bold: true);
         doc.Line("Print Bridge", EscPosAlign.Center, fontSize: 18f, bold: true);
         doc.Line("اختبار طباعة من مركز الطباعة", EscPosAlign.Center, fontSize: 18f, bold: true);

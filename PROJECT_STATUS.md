@@ -1,8 +1,15 @@
 # NIHA ERP — Project Status
 
-**Last updated:** 2026-07-15  
+**Last updated:** 2026-07-17  
 **App baseline:** 1.1.0 · Operational release `v1.1.0-production`  
+**Print Bridge baseline:** **0.5.0** (dual-environment connections — reference release)  
 **This file is the official at-a-glance project status.** Detailed module history lives in [`docs/modules.md`](./docs/modules.md).
+
+### Dual Environment Printing (Release مستقل)
+
+Bridge **0.5.0** + `print_ops_settings` + بوابة Testing + بانر إيصال الاختبار.  
+التفاصيل: [`docs/print-dual-env-testing.md`](./docs/print-dual-env-testing.md).  
+أي تطوير لاحق في الطباعة يبدأ من Bridge 0.5.0؛ لا يُغيَّر سلوك الاتصالات المزدوجة إلا بسبب قوي ومراجعة واضحة.
 
 ---
 
@@ -16,7 +23,7 @@
 | --- | --- |
 | نقطة البيع (POS) | ✅ مكتمل · مجمّد |
 | الطلبات (Orders) | ✅ مكتمل · مجمّد |
-| الطباعة (Printing + Bridge + Designer) | ✅ مكتمل · مجمّد |
+| الطباعة (Printing + Bridge + Designer) | ✅ مكتمل · مجمّد · Bridge **0.5.0** baseline · Dual Env Printing |
 | الورديات (Shifts + Shift Handover) | ✅ مكتمل · مجمّد |
 | الخزنة (Treasury) | ✅ مكتمل · مجمّد |
 | التقارير (Reports) | ✅ مكتمل · مجمّد |

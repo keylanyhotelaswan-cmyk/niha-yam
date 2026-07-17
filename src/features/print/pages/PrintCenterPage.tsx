@@ -9,6 +9,7 @@ import { PrintersTab } from '@/features/print/components/PrintersTab'
 import { QueueTab } from '@/features/print/components/QueueTab'
 import { SettingsTab } from '@/features/print/components/SettingsTab'
 import { TemplatesTab } from '@/features/print/components/TemplatesTab'
+import { TestingPrintArmedBanner } from '@/features/print/components/TestingPrintArmedBanner'
 import {
   usePrinterHealth,
   usePrinters,
@@ -66,6 +67,8 @@ export function PrintCenterPage() {
         description={t.print.subtitle}
         actions={<BridgeDownloadButton />}
       />
+
+      <TestingPrintArmedBanner />
 
       {!isLoading && !isError ? (
         <PrintCenterStatusBar health={health.data} />

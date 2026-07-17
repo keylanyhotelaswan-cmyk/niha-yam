@@ -47,19 +47,82 @@ public static class PairingHelper
         return true;
     }
 
-    public static bool HasCloudDefaults(BridgeConfig cfg) =>
-        !string.IsNullOrWhiteSpace(cfg.SupabaseUrl) &&
-        !string.IsNullOrWhiteSpace(cfg.AnonKey);
-
-    public static void ApplyParsed(BridgeConfig cfg, ParsedPair parsed)
+    public static bool HasCloudDefaults(BridgeConfig cfg, ParsedPair? parsed = null)
     {
-        if (!string.IsNullOrWhiteSpace(parsed.Url))
-            cfg.SupabaseUrl = parsed.Url!;
-        if (!string.IsNullOrWhiteSpace(parsed.AnonKey))
-            cfg.AnonKey = parsed.AnonKey!;
-        if (!string.IsNullOrWhiteSpace(parsed.RestaurantName))
-            cfg.RestaurantName = parsed.RestaurantName;
-        if (!string.IsNullOrWhiteSpace(parsed.PrintCenterUrl))
-            cfg.PrintCenterUrl = parsed.PrintCenterUrl;
+        if (parsed is { } p &&
+            !string.IsNullOrWhiteSpace(p.Url) &&
+            !string.IsNullOrWhiteSpace(p.AnonKey))
+            return true;
+
+        var target = ResolveTargetConnection(cfg, parsed);
+        return !string.IsNullOrWhiteSpace(target.SupabaseUrl) &&
+               !string.IsNullOrWhiteSpace(target.AnonKey);
     }
+
+    /// <summary>
+    /// Upsert connection for the pair target URL without removing other envs.
+    /// Re-pairing Testing adds/updates Testing; Production stays intact.
+    /// </summary>
+    public static BridgeConnection UpsertConnection(BridgeConfig cfg, ParsedPair parsed)
+    {
+        ConfigStore.Normalize(cfg);
+        var url = !string.IsNullOrWhiteSpace(parsed.Url)
+            ? parsed.Url!
+            : cfg.PrimaryConnection()?.SupabaseUrl ?? cfg.SupabaseUrl;
+
+        var conn = cfg.FindByUrl(url);
+        if (conn is null)
+        {
+            conn = new BridgeConnection
+            {
+                SupabaseUrl = url ?? "",
+                AnonKey = parsed.AnonKey ?? cfg.AnonKey ?? "",
+            };
+            cfg.Connections.Add(conn);
+        }
+
+        if (!string.IsNullOrWhiteSpace(parsed.Url))
+            conn.SupabaseUrl = parsed.Url!;
+        if (!string.IsNullOrWhiteSpace(parsed.AnonKey))
+            conn.AnonKey = parsed.AnonKey!;
+        if (!string.IsNullOrWhiteSpace(parsed.RestaurantName))
+            conn.RestaurantName = parsed.RestaurantName;
+        if (!string.IsNullOrWhiteSpace(parsed.PrintCenterUrl))
+            conn.PrintCenterUrl = parsed.PrintCenterUrl;
+
+        conn.Env = BridgeConnection.DetectEnv(conn.SupabaseUrl);
+        ConfigStore.SyncLegacyFields(cfg);
+        return conn;
+    }
+
+    public static BridgeConnection ResolveTargetConnection(BridgeConfig cfg, ParsedPair? parsed)
+    {
+        if (parsed is { } p && !string.IsNullOrWhiteSpace(p.Url))
+        {
+            var existing = cfg.FindByUrl(p.Url);
+            if (existing is not null) return existing;
+            return new BridgeConnection
+            {
+                SupabaseUrl = p.Url!,
+                AnonKey = p.AnonKey ?? "",
+                Env = BridgeConnection.DetectEnv(p.Url),
+            };
+        }
+
+        return cfg.PrimaryConnection() ?? new BridgeConnection
+        {
+            SupabaseUrl = cfg.SupabaseUrl,
+            AnonKey = cfg.AnonKey,
+            BridgeToken = cfg.BridgeToken,
+            BridgeId = cfg.BridgeId,
+            RestaurantName = cfg.RestaurantName,
+            RestaurantId = cfg.RestaurantId,
+            PrintCenterUrl = cfg.PrintCenterUrl,
+            Env = BridgeConnection.DetectEnv(cfg.SupabaseUrl),
+        };
+    }
+
+    [Obsolete("Use UpsertConnection")]
+    public static void ApplyParsed(BridgeConfig cfg, ParsedPair parsed) =>
+        UpsertConnection(cfg, parsed);
 }

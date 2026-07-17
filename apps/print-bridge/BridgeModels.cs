@@ -2,9 +2,61 @@ using System.Text.Json.Serialization;
 
 namespace Niha.PrintBridge;
 
-/// <summary>Local Bridge config — never stores service_role.</summary>
+/// <summary>One Supabase project connection (Production or Testing).</summary>
+public sealed class BridgeConnection
+{
+    public string Id { get; set; } = Guid.NewGuid().ToString("N")[..12];
+    /// <summary>production | testing | unknown</summary>
+    public string Env { get; set; } = "unknown";
+    public string SupabaseUrl { get; set; } = "";
+    public string AnonKey { get; set; } = "";
+    public string? BridgeToken { get; set; }
+    public string? BridgeId { get; set; }
+    public string? RestaurantName { get; set; }
+    public string? RestaurantId { get; set; }
+    public string? PrintCenterUrl { get; set; }
+    public DateTimeOffset? LastHeartbeatAt { get; set; }
+    public string? LastError { get; set; }
+
+    [JsonIgnore]
+    public bool IsPaired =>
+        !string.IsNullOrWhiteSpace(BridgeToken) &&
+        !string.IsNullOrWhiteSpace(SupabaseUrl) &&
+        !string.IsNullOrWhiteSpace(AnonKey);
+
+    public static string DetectEnv(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return "unknown";
+        var u = url.ToLowerInvariant();
+        if (u.Contains("xywgmolpnhimivwmsmpw", StringComparison.Ordinal)) return "testing";
+        if (u.Contains("nzwgoavyrshuypkugvzc", StringComparison.Ordinal)) return "production";
+        return "unknown";
+    }
+
+    public static bool UrlsMatch(string? a, string? b)
+    {
+        if (string.IsNullOrWhiteSpace(a) || string.IsNullOrWhiteSpace(b)) return false;
+        try
+        {
+            var ua = new Uri(a.TrimEnd('/') + "/");
+            var ub = new Uri(b.TrimEnd('/') + "/");
+            return string.Equals(ua.Host, ub.Host, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return string.Equals(a.TrimEnd('/'), b.TrimEnd('/'), StringComparison.OrdinalIgnoreCase);
+        }
+    }
+}
+
+/// <summary>Local Bridge config — never stores service_role. Supports dual env (Prod + Testing).</summary>
 public sealed class BridgeConfig
 {
+    /// <summary>Paired cloud connections (Production and/or Testing).</summary>
+    public List<BridgeConnection> Connections { get; set; } = new();
+
+    // Legacy single-connection fields — kept for upgrade + MainForm summary.
+    // ConfigStore.Normalize migrates them into Connections and keeps them synced.
     public string SupabaseUrl { get; set; } = "";
     public string AnonKey { get; set; } = "";
     public string? BridgeToken { get; set; }
@@ -25,6 +77,19 @@ public sealed class BridgeConfig
     public DateTimeOffset? LastHeartbeatAt { get; set; }
     /// <summary>When false (default), hide PDF/OneNote/XPS-style virtual printers.</summary>
     public bool ShowVirtualPrinters { get; set; }
+
+    public IEnumerable<BridgeConnection> PairedConnections() =>
+        Connections.Where(c => c.IsPaired);
+
+    public BridgeConnection? FindByUrl(string? url) =>
+        Connections.FirstOrDefault(c => BridgeConnection.UrlsMatch(c.SupabaseUrl, url));
+
+    /// <summary>Prefer Production for legacy summary fields; else first paired.</summary>
+    public BridgeConnection? PrimaryConnection() =>
+        PairedConnections().FirstOrDefault(c =>
+            string.Equals(c.Env, "production", StringComparison.OrdinalIgnoreCase))
+        ?? PairedConnections().FirstOrDefault()
+        ?? Connections.FirstOrDefault();
 }
 
 public sealed class ClaimedJob

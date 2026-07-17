@@ -268,6 +268,8 @@ export function PrinterDialog({ printer, open, onOpenChange }: Props) {
                     {deviceOptions.map((d) => (
                       <option key={d.id} value={d.windows_name}>
                         {d.windows_name}
+                        {d.driver_name ? ` · ${d.driver_name}` : ''}
+                        {d.port_name ? ` · ${d.port_name}` : ''}
                         {d.assigned_printer_id &&
                         d.assigned_printer_id !== printer?.id
                           ? ` · ${t.print.printers.alreadyAssigned}`

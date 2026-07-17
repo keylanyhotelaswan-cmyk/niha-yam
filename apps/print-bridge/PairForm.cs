@@ -192,7 +192,7 @@ public sealed class PairForm : Form
             }
             // Show only the code — never JSON
             _code.Text = parsed.Code;
-            PairingHelper.ApplyParsed(_cfg, parsed);
+            PairingHelper.UpsertConnection(_cfg, parsed);
             _status.Text = "";
         }
         catch
@@ -235,7 +235,7 @@ public sealed class PairForm : Form
             }
 
             _code.Text = parsed.Code;
-            PairingHelper.ApplyParsed(_cfg, parsed);
+            PairingHelper.UpsertConnection(_cfg, parsed);
             _status.Text = "";
             _status.ForeColor = NihaTheme.Muted;
         }
@@ -257,8 +257,8 @@ public sealed class PairForm : Form
             return;
         }
 
-        PairingHelper.ApplyParsed(_cfg, parsed);
-        if (!PairingHelper.HasCloudDefaults(_cfg))
+        var conn = PairingHelper.UpsertConnection(_cfg, parsed);
+        if (!PairingHelper.HasCloudDefaults(_cfg, parsed))
         {
             _status.Text = Ar.MissingCloudConfig;
             _status.ForeColor = NihaTheme.Danger;
@@ -272,8 +272,8 @@ public sealed class PairForm : Form
 
         try
         {
-            var api = new SupabaseBridgeApi(_cfg);
-            var version = typeof(PairForm).Assembly.GetName().Version?.ToString() ?? "0.2.0";
+            var api = new SupabaseBridgeApi(conn);
+            var version = typeof(PairForm).Assembly.GetName().Version?.ToString() ?? "0.5.0";
             var result = await api.PairAsync(
                 parsed.Code,
                 Environment.MachineName,
@@ -282,13 +282,14 @@ public sealed class PairForm : Form
                 version,
                 CancellationToken.None);
 
-            _cfg.BridgeToken = result.GetProperty("token").GetString();
-            _cfg.BridgeId = result.GetProperty("bridge_id").GetString();
+            conn.BridgeToken = result.GetProperty("token").GetString();
+            conn.BridgeId = result.GetProperty("bridge_id").GetString();
             if (result.TryGetProperty("restaurant_id", out var rid))
-                _cfg.RestaurantId = rid.GetString();
+                conn.RestaurantId = rid.GetString();
             if (result.TryGetProperty("restaurant_name", out var rn) &&
                 !string.IsNullOrWhiteSpace(rn.GetString()))
-                _cfg.RestaurantName = rn.GetString();
+                conn.RestaurantName = rn.GetString();
+            conn.Env = BridgeConnection.DetectEnv(conn.SupabaseUrl);
             // Do not invent a placeholder name — wait for heartbeat if missing
 
             ConfigStore.Save(_cfg);

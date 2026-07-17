@@ -44,13 +44,72 @@ public static class ConfigStore
 
         // Prefill from package defaults (shipped next to exe by Print Center download).
         ApplyDefaults(cfg);
+        Normalize(cfg);
         return cfg;
     }
 
     public static void Save(BridgeConfig cfg)
     {
+        Normalize(cfg);
         Directory.CreateDirectory(Dir);
         File.WriteAllText(ConfigPath, JsonSerializer.Serialize(cfg, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    /// <summary>
+    /// Migrate legacy single-connection config into Connections and keep summary fields in sync.
+    /// Pairing a second env (Testing) adds a connection — it never wipes Production.
+    /// </summary>
+    public static void Normalize(BridgeConfig cfg)
+    {
+        cfg.Connections ??= new List<BridgeConnection>();
+
+        if (cfg.Connections.Count == 0 &&
+            (!string.IsNullOrWhiteSpace(cfg.BridgeToken) || !string.IsNullOrWhiteSpace(cfg.SupabaseUrl)))
+        {
+            cfg.Connections.Add(new BridgeConnection
+            {
+                Env = BridgeConnection.DetectEnv(cfg.SupabaseUrl),
+                SupabaseUrl = cfg.SupabaseUrl ?? "",
+                AnonKey = cfg.AnonKey ?? "",
+                BridgeToken = cfg.BridgeToken,
+                BridgeId = cfg.BridgeId,
+                RestaurantName = cfg.RestaurantName,
+                RestaurantId = cfg.RestaurantId,
+                PrintCenterUrl = cfg.PrintCenterUrl,
+                LastHeartbeatAt = cfg.LastHeartbeatAt,
+            });
+        }
+
+        foreach (var c in cfg.Connections)
+        {
+            if (string.IsNullOrWhiteSpace(c.Env) || c.Env == "unknown")
+                c.Env = BridgeConnection.DetectEnv(c.SupabaseUrl);
+        }
+
+        // Drop empty shells
+        cfg.Connections = cfg.Connections
+            .Where(c => !string.IsNullOrWhiteSpace(c.SupabaseUrl) || !string.IsNullOrWhiteSpace(c.BridgeToken))
+            .ToList();
+
+        SyncLegacyFields(cfg);
+    }
+
+    public static void SyncLegacyFields(BridgeConfig cfg)
+    {
+        var primary = cfg.PrimaryConnection();
+        if (primary is null) return;
+        cfg.SupabaseUrl = primary.SupabaseUrl;
+        cfg.AnonKey = primary.AnonKey;
+        cfg.BridgeToken = primary.BridgeToken;
+        cfg.BridgeId = primary.BridgeId;
+        cfg.RestaurantName = primary.RestaurantName;
+        cfg.RestaurantId = primary.RestaurantId;
+        cfg.PrintCenterUrl = primary.PrintCenterUrl;
+        cfg.LastHeartbeatAt = cfg.PairedConnections()
+            .Select(c => c.LastHeartbeatAt)
+            .Where(t => t is not null)
+            .DefaultIfEmpty(null)
+            .Max();
     }
 
     private static void ApplyDefaults(BridgeConfig cfg)
@@ -130,9 +189,9 @@ public sealed class PrintWorker
         {
             try
             {
-                if (string.IsNullOrWhiteSpace(_cfg.BridgeToken) ||
-                    string.IsNullOrWhiteSpace(_cfg.SupabaseUrl) ||
-                    string.IsNullOrWhiteSpace(_cfg.AnonKey))
+                ConfigStore.Normalize(_cfg);
+                var paired = _cfg.PairedConnections().ToList();
+                if (paired.Count == 0)
                 {
                     SetState(BridgeLinkState.NotPaired);
                     await Task.Delay(_cfg.PollMs, ct);
@@ -140,61 +199,74 @@ public sealed class PrintWorker
                 }
 
                 SetState(BridgeLinkState.Connecting);
-                var api = new SupabaseBridgeApi(_cfg);
-                try
-                {
-                    await api.HeartbeatAsync(restarted, ct);
-                    restarted = false;
-                    _cfg.LastHeartbeatAt = DateTimeOffset.Now;
-                    SetState(BridgeLinkState.Connected);
+                var anyConnected = false;
+                var printers = WindowsPrinterInventory.Discover();
 
-                    // Report Windows printer inventory to Print Center (every loop)
+                foreach (var conn in paired)
+                {
+                    var envTag = conn.Env;
+                    var api = new SupabaseBridgeApi(conn);
                     try
                     {
-                        await api.ReportPrintersAsync(DiscoverWindowsPrinters(), ct);
-                    }
-                    catch (Exception ex)
-                    {
-                        _log.Error($"report printers: {ex.Message}");
-                    }
+                        await api.HeartbeatAsync(restarted, ct);
+                        conn.LastHeartbeatAt = DateTimeOffset.Now;
+                        conn.LastError = null;
+                        anyConnected = true;
 
-                    await FlushOfflineAsync(api, ct);
-                    var jobs = await api.ClaimAsync(10, ct);
-                    // Temporary poll diagnostics (remove after claim bug freeze)
-                    _log.Info(
-                        $"poll claim: found={jobs.Count} bridgeId={_cfg.BridgeId ?? "?"} " +
-                        $"tokenPrefix={(_cfg.BridgeToken is { Length: >= 8 } t ? t[..8] : "?")}");
-                    if (jobs.Count == 0)
-                    {
-                        if (DateTimeOffset.UtcNow - _lastEmptyClaimDiagAt > TimeSpan.FromSeconds(30))
+                        try
                         {
-                            _lastEmptyClaimDiagAt = DateTimeOffset.UtcNow;
-                            try
+                            await api.ReportPrintersAsync(printers, ct);
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.Error($"[{envTag}] report printers: {ex.Message}");
+                        }
+
+                        await FlushOfflineAsync(api, conn.SupabaseUrl, ct);
+                        var jobs = await api.ClaimAsync(10, ct);
+                        _log.Info(
+                            $"[{envTag}] poll claim: found={jobs.Count} bridgeId={conn.BridgeId ?? "?"} " +
+                            $"tokenPrefix={(conn.BridgeToken is { Length: >= 8 } t ? t[..8] : "?")}");
+
+                        if (jobs.Count == 0)
+                        {
+                            if (DateTimeOffset.UtcNow - _lastEmptyClaimDiagAt > TimeSpan.FromSeconds(30))
                             {
-                                var diag = await api.DiagnoseClaimAsync(ct);
-                                _log.Info($"claim_diag: {diag}");
-                            }
-                            catch (Exception dex)
-                            {
-                                _log.Error($"claim_diag: {dex.Message}");
+                                _lastEmptyClaimDiagAt = DateTimeOffset.UtcNow;
+                                try
+                                {
+                                    var diag = await api.DiagnoseClaimAsync(ct);
+                                    _log.Info($"[{envTag}] claim_diag: {diag}");
+                                }
+                                catch (Exception dex)
+                                {
+                                    _log.Error($"[{envTag}] claim_diag: {dex.Message}");
+                                }
                             }
                         }
+                        else
+                        {
+                            foreach (var j in jobs)
+                                _log.Info(
+                                    $"[{envTag}] claimed job {j.Reference ?? j.Id.ToString()} " +
+                                    $"printerId={j.Printer?.Id} win={ResolvePrinterName(j)}");
+                        }
+
+                        foreach (var job in jobs)
+                            await ProcessJobAsync(api, conn.SupabaseUrl, job, ct);
                     }
-                    else
+                    catch (Exception ex) when (ex is not OperationCanceledException)
                     {
-                        foreach (var j in jobs)
-                            _log.Info(
-                                $"claimed job {j.Reference ?? j.Id.ToString()} " +
-                                $"printerId={j.Printer?.Id} win={ResolvePrinterName(j)}");
+                        conn.LastError = ex.Message;
+                        _log.Error($"[{envTag}] loop: {ex.Message}");
                     }
-                    foreach (var job in jobs)
-                        await ProcessJobAsync(api, job, ct);
                 }
-                catch (Exception ex) when (ex is not OperationCanceledException)
-                {
-                    _log.Error($"loop: {ex.Message}");
-                    SetState(BridgeLinkState.Disconnected);
-                }
+
+                restarted = false;
+                ConfigStore.SyncLegacyFields(_cfg);
+                try { ConfigStore.Save(_cfg); } catch { /* ignore disk races */ }
+
+                SetState(anyConnected ? BridgeLinkState.Connected : BridgeLinkState.Disconnected);
             }
             catch (OperationCanceledException) { break; }
 
@@ -203,14 +275,14 @@ public sealed class PrintWorker
         }
     }
 
-    private async Task FlushOfflineAsync(SupabaseBridgeApi api, CancellationToken ct)
+    private async Task FlushOfflineAsync(SupabaseBridgeApi api, string connectionKey, CancellationToken ct)
     {
-        foreach (var (id, ok, code, msg, delivery) in _offline.ListPending())
+        foreach (var (id, ok, code, msg, delivery) in _offline.ListPending(connectionKey))
         {
             try
             {
                 await api.ReportAsync(id, ok, code, msg, delivery, ct);
-                _offline.Remove(id);
+                _offline.Remove(id, connectionKey);
             }
             catch (Exception ex)
             {
@@ -220,7 +292,11 @@ public sealed class PrintWorker
         }
     }
 
-    private async Task ProcessJobAsync(SupabaseBridgeApi api, ClaimedJob job, CancellationToken ct)
+    private async Task ProcessJobAsync(
+        SupabaseBridgeApi api,
+        string connectionKey,
+        ClaimedJob job,
+        CancellationToken ct)
     {
         // BP-12: never auto-print past TTL
         if (job.ExpiresAt is { } exp && exp < DateTimeOffset.UtcNow)
@@ -232,7 +308,7 @@ public sealed class PrintWorker
             }
             catch (Exception ex)
             {
-                _offline.EnqueueReport(job.Id, false, "TTL_EXPIRED", ex.Message, "transport_ack");
+                _offline.EnqueueReport(job.Id, false, "TTL_EXPIRED", ex.Message, "transport_ack", connectionKey);
             }
             PrintFinished?.Invoke(false, $"{job.Reference ?? job.Id.ToString()} · TTL");
             return;
@@ -252,7 +328,7 @@ public sealed class PrintWorker
             }
             catch
             {
-                _offline.EnqueueReport(job.Id, true, null, null, delivery);
+                _offline.EnqueueReport(job.Id, true, null, null, delivery, connectionKey);
             }
             _log.Info($"printed job {job.Id} → {printerName} ({delivery})");
             PrintFinished?.Invoke(true, $"{job.Reference ?? "job"} → {printerName}");
@@ -266,7 +342,7 @@ public sealed class PrintWorker
             }
             catch
             {
-                _offline.EnqueueReport(job.Id, false, "PRINT_FAILED", ex.Message, "transport_ack");
+                _offline.EnqueueReport(job.Id, false, "PRINT_FAILED", ex.Message, "transport_ack", connectionKey);
             }
             PrintFinished?.Invoke(false, ex.Message);
         }
@@ -274,50 +350,34 @@ public sealed class PrintWorker
 
     private static string ResolvePrinterName(ClaimedJob job)
     {
-        // Prefer Windows printer name from address.jsonb
+        string? wanted = null;
+
         if (job.Printer?.Address is JsonElement el &&
             el.ValueKind == JsonValueKind.Object)
         {
             if (el.TryGetProperty("windows_printer_name", out var wp1))
-            {
-                var name = wp1.GetString();
-                if (!string.IsNullOrWhiteSpace(name)) return name!;
-            }
-            if (el.TryGetProperty("windows_printer", out var wp2))
-            {
-                var name = wp2.GetString();
-                if (!string.IsNullOrWhiteSpace(name)) return name!;
-            }
+                wanted = wp1.GetString();
+            if (string.IsNullOrWhiteSpace(wanted) &&
+                el.TryGetProperty("windows_printer", out var wp2))
+                wanted = wp2.GetString();
         }
 
-        // Fallback: payload from enqueue_test_print
-        try
+        if (string.IsNullOrWhiteSpace(wanted))
         {
-            if (job.Payload is JsonElement payload &&
-                payload.ValueKind == JsonValueKind.Object &&
-                payload.TryGetProperty("windows_printer_name", out var fromPayload))
+            try
             {
-                var name = fromPayload.GetString();
-                if (!string.IsNullOrWhiteSpace(name)) return name!;
+                if (job.Payload is JsonElement payload &&
+                    payload.ValueKind == JsonValueKind.Object &&
+                    payload.TryGetProperty("windows_printer_name", out var fromPayload))
+                    wanted = fromPayload.GetString();
             }
+            catch { /* ignore */ }
         }
-        catch { /* ignore */ }
 
-        return job.Printer?.Name ?? "Microsoft Print to PDF";
-    }
+        if (string.IsNullOrWhiteSpace(wanted))
+            wanted = job.Printer?.Name;
 
-    private static List<(string Name, bool IsVirtual)> DiscoverWindowsPrinters()
-    {
-        var list = new List<(string, bool)>();
-        try
-        {
-            foreach (string name in System.Drawing.Printing.PrinterSettings.InstalledPrinters)
-                list.Add((name, PrinterFilter.IsVirtual(name)));
-        }
-        catch
-        {
-            /* ignore */
-        }
-        return list;
+        // Never hard-fail on a stale Windows queue name (copy 1 / USB / new PC).
+        return WindowsPrinterInventory.ResolveLocalName(wanted);
     }
 }

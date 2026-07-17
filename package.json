@@ -45,7 +45,8 @@
     "test:pos-hold": "node --experimental-strip-types scripts/test-pos-hold.ts",
     "test:line-note": "node --experimental-strip-types scripts/test-line-note.ts",
     "test:field-text": "node --experimental-strip-types scripts/test-field-text.ts",
-    "bridge:publish": "node scripts/publish-print-bridge.mjs"
+    "bridge:publish": "node scripts/publish-print-bridge.mjs",
+    "test:print-dual-env": "node scripts/test-print-dual-env.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

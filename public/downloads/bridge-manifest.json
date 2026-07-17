@@ -1,10 +1,10 @@
 {
   "name": "NIHA Print Bridge",
-  "version": "0.3.16",
+  "version": "0.5.0",
   "file": "niha-print-bridge-win-x64.zip",
   "url": "/downloads/niha-print-bridge-win-x64.zip",
   "platform": "win-x64",
   "selfContained": true,
-  "publishedAt": "2026-07-14T12:07:27.565Z",
-  "sizeBytes": 66904391
+  "publishedAt": "2026-07-16T17:43:15.184Z",
+  "sizeBytes": 67030624
 }

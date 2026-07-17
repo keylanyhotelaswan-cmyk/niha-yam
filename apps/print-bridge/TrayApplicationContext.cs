@@ -75,7 +75,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             Icon = icon ?? SystemIcons.Application,
             Visible = true,
-            Text = string.IsNullOrWhiteSpace(_cfg.BridgeToken)
+            Text = !_cfg.PairedConnections().Any()
                 ? Ar.TrayNotPaired
                 : Ar.TrayPaired,
             ContextMenuStrip = menu,
@@ -171,7 +171,7 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             t.Stop();
             t.Dispose();
-            if (string.IsNullOrWhiteSpace(_cfg.BridgeToken))
+            if (!_cfg.PairedConnections().Any())
                 DoPair(force: false);
             ShowMain();
         };
@@ -191,23 +191,17 @@ public sealed class TrayApplicationContext : ApplicationContext
         _main.BringToFront();
         _main.Activate();
         _main.RefreshStatus(
-            string.IsNullOrWhiteSpace(_cfg.BridgeToken)
+            !_cfg.PairedConnections().Any()
                 ? BridgeLinkState.NotPaired
                 : BridgeLinkState.Connecting);
     }
 
     private void DoPair(bool force)
     {
-        if (!force && !string.IsNullOrWhiteSpace(_cfg.BridgeToken))
+        // force = open pair dialog to add/update an env (QR targets Testing or Production).
+        // Never wipe other connections — dual-env relies on keeping both tokens.
+        if (!force && _cfg.PairedConnections().Any())
             return;
-
-        if (force)
-        {
-            _cfg.BridgeToken = null;
-            _cfg.BridgeId = null;
-            ConfigStore.Save(_cfg);
-            _tray.Text = Ar.TrayNotPaired;
-        }
 
         using var form = new PairForm(_cfg);
         if (form.ShowDialog() == DialogResult.OK && form.PairedOk)

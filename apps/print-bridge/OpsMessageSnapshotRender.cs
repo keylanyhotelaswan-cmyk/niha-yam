@@ -31,6 +31,8 @@ internal static class OpsMessageSnapshotRender
             var paperMm = job.Printer?.PaperWidthMm ?? 80;
             var doc = new EscPosDocument(widthDots: paperMm <= 58 ? 384 : 576);
 
+            TestEnvBanner.Write(doc, job);
+
             var title = Str(snap, "title_ar") ?? "رسالة تشغيلية";
             doc.Line(title, EscPosAlign.Center, fontSize: 28f, bold: true);
             doc.Separator();

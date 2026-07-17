@@ -65,10 +65,33 @@ export function useDiagnosePrintSystem() {
   })
 }
 
+export function useBootstrapTestPrintEnvironment() {
+  return useMutation({
+    mutationFn: () => api.bootstrapTestPrintEnvironment(),
+  })
+}
+
+export function useSetTestingPrintEnabled() {
+  const invalidate = useInvalidateAll()
+  return useMutation({
+    mutationFn: (enabled: boolean) => api.setTestingPrintEnabled(enabled),
+    onSuccess: invalidate,
+  })
+}
+
 export function useSyncPrintStationBindings() {
   const invalidate = useInvalidateAll()
   return useMutation({
     mutationFn: () => api.syncPrintStationBindings(),
+    onSuccess: invalidate,
+  })
+}
+
+export function useChooseCashierWindowsPrinter() {
+  const invalidate = useInvalidateAll()
+  return useMutation({
+    mutationFn: (windowsName: string) =>
+      api.chooseCashierWindowsPrinter(windowsName),
     onSuccess: invalidate,
   })
 }

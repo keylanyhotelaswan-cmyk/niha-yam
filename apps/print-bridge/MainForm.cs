@@ -515,12 +515,10 @@ public sealed class MainForm : Form
 
     public void RefreshStatus(BridgeLinkState state)
     {
-        var paired = !string.IsNullOrWhiteSpace(_cfg.BridgeToken);
+        var paired = _cfg.PairedConnections().Any();
         _pairStatus.Text = paired ? Ar.Paired : Ar.NotPaired;
         _pairStatus.ForeColor = paired ? NihaTheme.Success : NihaTheme.Warning;
-        _restaurant.Text = string.IsNullOrWhiteSpace(_cfg.RestaurantName)
-            ? Ar.None
-            : _cfg.RestaurantName!;
+        _restaurant.Text = FormatEnvironments();
         _device.Text = Environment.MachineName;
 
         _linkStatus.Text = state switch
@@ -554,6 +552,25 @@ public sealed class MainForm : Form
         if (_cfg.LastPrintAt is null) return Ar.None;
         var mark = _cfg.LastPrintOk == true ? Ar.PrintOk : Ar.PrintFail;
         return $"{mark} · {_cfg.LastPrintSummary} · {_cfg.LastPrintAt.Value.ToLocalTime():g}";
+    }
+
+    private string FormatEnvironments()
+    {
+        var parts = _cfg.PairedConnections()
+            .Select(c =>
+            {
+                var env = c.Env switch
+                {
+                    "production" => Ar.EnvProduction,
+                    "testing" => Ar.EnvTesting,
+                    _ => Ar.EnvUnknown,
+                };
+                var name = string.IsNullOrWhiteSpace(c.RestaurantName) ? env : $"{env}: {c.RestaurantName}";
+                return name;
+            })
+            .ToList();
+        if (parts.Count == 0) return Ar.None;
+        return string.Join(" · ", parts);
     }
 
     private void RequestRePair()

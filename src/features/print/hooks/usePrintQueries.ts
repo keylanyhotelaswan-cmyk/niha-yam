@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import * as api from '@/features/print/api/print.api'
 import { printKeys } from '@/features/print/hooks/print.keys'
+import { isTestingEnv } from '@/shared/config/appEnv'
 
 export function usePrinters() {
   return useQuery({
@@ -68,5 +69,21 @@ export function usePrintDocumentPreview(docType: string, enabled = true) {
     queryKey: printKeys.documentPreview(docType),
     queryFn: () => api.previewPrintDocument(docType),
     enabled: enabled && Boolean(docType),
+  })
+}
+
+/** Testing UI only — ops toggle state for armed banner / diagnostics. */
+export function usePrintOpsSettings() {
+  return useQuery({
+    queryKey: printKeys.ops(),
+    enabled: isTestingEnv(),
+    queryFn: async () => {
+      try {
+        return await api.bootstrapTestPrintEnvironment()
+      } catch {
+        return await api.getPrintOpsSettings()
+      }
+    },
+    refetchInterval: 20_000,
   })
 }

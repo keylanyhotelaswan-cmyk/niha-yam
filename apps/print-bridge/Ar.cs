@@ -30,7 +30,10 @@ public static class Ar
     public const string Paired = "مقترن";
 
     public const string DeviceName = "اسم الجهاز";
-    public const string Restaurant = "المطعم";
+    public const string Restaurant = "البيئة / المطعم";
+    public const string EnvProduction = "إنتاج";
+    public const string EnvTesting = "اختبار";
+    public const string EnvUnknown = "بيئة";
     public const string Printers = "الطابعات";
     public const string NoPrinters = "لا توجد طابعات مثبتة على هذا الجهاز";
     public const string TestPrint = "اختبار محلي (تشخيص)";
@@ -44,7 +47,7 @@ public static class Ar
     public const string LastPrint = "آخر عملية طباعة";
     public const string None = "—";
 
-    public const string RePair = "إعادة الاقتران";
+    public const string RePair = "ربط بيئة (إنتاج أو اختبار)";
     public const string OpenPrintCenter = "فتح مركز الطباعة";
     public const string ShowWindow = "فتح النافذة";
     public const string Exit = "خروج";

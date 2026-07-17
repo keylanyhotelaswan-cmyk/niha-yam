@@ -32,6 +32,8 @@ internal static class HandoverSnapshotRender
             var doc = new EscPosDocument(widthDots: style.PaperWidthMm <= 58 ? 384 : 576);
             var cur = Str(snap, "currency_label") ?? "ج.م";
 
+            TestEnvBanner.Write(doc, job);
+
             var title = Str(snap, "title_ar") ?? "إيصال تسليم عهدة";
             doc.Line(title, EscPosAlign.Center, fontSize: style.FontTitlePt, bold: true);
             doc.Separator();

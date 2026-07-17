@@ -38,6 +38,9 @@ supabase/.temp
 # Test
 coverage
 test-results
+
+# Local NuGet cache (sandbox restores)
+.nuget-packages
 playwright-report
 
 # Print Bridge publish artifacts (local publish tree only)
