@@ -113,6 +113,31 @@ public sealed class TrayApplicationContext : ApplicationContext
 
     public async Task RunUpdateCheckAsync(bool interactive)
     {
+        // Always show UpdateForm on the UI thread.
+        if (_main is { IsHandleCreated: true, IsDisposed: false } && _main.InvokeRequired)
+        {
+            var tcs = new TaskCompletionSource();
+            _main.BeginInvoke(new Action(async () =>
+            {
+                try
+                {
+                    await RunUpdateCheckCoreAsync(interactive);
+                    tcs.TrySetResult();
+                }
+                catch (Exception ex)
+                {
+                    tcs.TrySetException(ex);
+                }
+            }));
+            await tcs.Task;
+            return;
+        }
+
+        await RunUpdateCheckCoreAsync(interactive);
+    }
+
+    private async Task RunUpdateCheckCoreAsync(bool interactive)
+    {
         if (!_cfg.AutoUpdate && !interactive)
             return;
 
@@ -136,28 +161,32 @@ public sealed class TrayApplicationContext : ApplicationContext
         if (!interactive && !_cfg.AutoUpdate)
             return;
 
-        var go = interactive
-            ? MessageBox.Show(
-                $"{check.Message}\n\n{Ar.UpdateConfirm}",
-                Ar.AppTitle,
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question) == DialogResult.Yes
-            : true;
-
-        if (!go || check.Manifest is null)
+        if (check.Manifest is null)
             return;
 
-        var (ok, msg) = await BridgeUpdater.DownloadAndApplyAsync(_cfg, check.Manifest);
-        _log.Info($"update apply: {msg}");
-        if (!ok)
+        // Never silent-apply mid-shift — balloon + What’s New form.
+        if (!interactive)
         {
-            MessageBox.Show(msg, Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            try
+            {
+                _tray.ShowBalloonTip(
+                    8000,
+                    Ar.UpdateTitle,
+                    check.Message,
+                    ToolTipIcon.Info);
+            }
+            catch { /* ignore */ }
+        }
+
+        using var form = new UpdateForm(_cfg, check);
+        var applied = form.ShowDialog() == DialogResult.OK && form.AppliedOk;
+        if (!applied)
+        {
+            _log.Info("update deferred by operator");
             return;
         }
 
-        if (interactive)
-            MessageBox.Show(msg, Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+        _log.Info("update apply started — exiting for restart");
         await _worker.StopAsync();
         _offline.Dispose();
         _tray.Visible = false;

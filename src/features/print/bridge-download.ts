@@ -1,6 +1,7 @@
 /** Official Print Center download paths for NIHA Print Bridge (BP-14). */
 export const BRIDGE_DOWNLOAD = {
   zipUrl: '/downloads/niha-print-bridge-win-x64.zip',
+  setupUrl: '/downloads/NihaPrintBridge-Setup.exe',
   manifestUrl: '/downloads/bridge-manifest.json',
 } as const
 
@@ -9,10 +10,15 @@ export type BridgeManifest = {
   version: string
   file: string
   url: string
+  /** Optional Inno Setup installer path (preferred for cashiers). */
+  setupUrl?: string | null
+  setupFile?: string | null
   platform: string
   selfContained: boolean
   publishedAt: string
   sizeBytes: number | null
+  /** Arabic What’s New for Bridge updater UI. */
+  notes?: string | null
 }
 
 export async function fetchBridgeManifest(): Promise<BridgeManifest | null> {
@@ -66,6 +72,20 @@ export function buildPairPayload(code: string): string {
     restaurantName: tBrandFallback(),
     printCenterUrl: origin ? `${origin}/admin/print` : undefined,
   })
+}
+
+/**
+ * Single-line Pairing Token (base64url of the same JSON as QR).
+ * Equal to QR for cashiers without a camera — paste into Bridge.
+ */
+export function buildPairingToken(code: string): string {
+  const json = buildPairPayload(code)
+  const bytes = new TextEncoder().encode(json)
+  let binary = ''
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]!)
+  }
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
 }
 
 function tBrandFallback(): string {

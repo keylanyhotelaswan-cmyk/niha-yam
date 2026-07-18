@@ -6,17 +6,43 @@ Standalone **.NET 8 Windows tray** app — [ADR-0030](../../docs/adr/0030-niha-p
 
 Managers download from **Print Center** only (BP-14):
 
-**الإدارة → مركز الطباعة → تنزيل NIHA Print Bridge**
+**الإدارة → مركز الطباعة → تنزيل المثبّت (Setup)**
 
 ```bash
 pnpm bridge:publish
 ```
 
+Produces under `public/downloads/`:
+
+| Artifact | Purpose |
+|----------|---------|
+| `NihaPrintBridge-Setup.exe` | Inno Setup → `%LocalAppData%\Programs\NIHA Print Bridge` + Desktop/Start Menu |
+| `niha-print-bridge-win-x64.zip` | Auto-update package + IT zip fallback |
+| `bridge-manifest.json` | Version, `notes` (What’s New), `setupUrl`, zip `url` |
+
+Requires [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`ISCC.exe`) on the build machine for Setup.exe. Zip always publishes.
+
+## Install vs data
+
+| Path | Contents |
+|------|----------|
+| `%LocalAppData%\Programs\NIHA Print Bridge` | Binaries (updated in place) |
+| `%LocalAppData%\NihaPrintBridge` | `config.json` Connections, logs, offline DB — **never wiped by update** |
+
+## Pairing (no camera)
+
+1. Print Center → create pair code → **نسخ رمز الربط الكامل** (or QR).
+2. Bridge → **لصق الرمز** (primary) or Scan QR from clipboard image.
+3. Short code alone is only for the **first** environment; dual-env needs full token/QR.
+
+## Auto-update
+
+Tray / Settings → **التحقق من التحديث**. Shows What’s New, download %, install, restart. Auto-check every 6h shows a balloon + the same form (never silent mid-shift apply).
+
 ## Arabic output (v0.2.3+)
 
 Arabic lines are drawn with **GDI+ Uniscribe** (joined RTL), then sent as
-**ESC \*** bit-image bands (widely supported). Older `GS v 0` was ignored by
-some printers, which then printed raw bytes as broken disconnected Arabic.
+**ESC \*** bit-image bands (widely supported).
 
 ## Principles
 
@@ -26,17 +52,14 @@ some printers, which then printed raw bytes as broken disconnected Arabic.
 - Offline SQLite buffer; **TTL** enforced (no auto-print of expired jobs).
 - Report `delivery=transport_ack` by default (send ≠ paper-out).
 
-## Field test checklist (before closing M6)
+## Field test checklist
 
-1. Download Bridge from Print Center on a fresh PC  
-2. Run exe → Arabic pair screen (code only)  
-3. Pair → success → main window  
-4. Bridge online in Print Center → Health  
-5. Select printer → Test Print → paper  
-6. POS order → jobs → paper  
-7. Queue: Retry / Print Again / Cancel  
-8. Net down **&lt; TTL** → resume  
-9. Net down **&gt; TTL** → expired → Print Again  
+1. Install via Setup.exe on a fresh PC  
+2. Pair with Pairing Token (no camera) → success  
+3. Bridge online in Print Center → Health  
+4. POS order → jobs → paper  
+5. Check for update → What’s New → Update Now → restart keeps pairing  
+6. Dual-env: paste Testing Pairing Token → both envs stay  
 
 ## Autostart
 

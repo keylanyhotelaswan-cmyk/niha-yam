@@ -7,7 +7,7 @@ Use one cashier PC, one physical printer, and one NIHA Print Bridge install for 
 ## Design
 
 1. **Bridge multi-connection (v0.5.0+)**  
-   Local `config.json` holds a `Connections[]` list. Pairing from Testing QR **adds/updates** the Testing connection and **does not wipe** Production.
+   Local `config.json` holds a `Connections[]` list. Pairing from Testing QR **or Pairing Token** **adds/updates** the Testing connection and **does not wipe** Production. Short pair codes alone are not enough for a second env (Bridge 0.5.3+).
 
 2. **Server-side Testing gate**  
    Table `print_ops_settings`:
@@ -23,7 +23,7 @@ Use one cashier PC, one physical printer, and one NIHA Print Bridge install for 
 
 1. Keep Production Bridge paired as usual.
 2. Open Testing Print Center → Diagnostics → bootstrap runs automatically (`testing_print_enabled` stays **OFF** by default).
-3. Once: **ربط بيئة** and scan the Testing pair QR (adds second connection).
+3. Once: **ربط بيئة** — copy **رمز الربط الكامل** (no camera) or scan Testing QR (adds second connection).
 4. **تفعيل الطباعة للاختبار** only while testing (confirm dialog + red armed banner across Print Center).
 5. **إيقاف فوري** as soon as the test ends — Production keeps printing normally.
 
@@ -45,6 +45,16 @@ Bridge package: bump to **0.5.0**, then `pnpm bridge:publish` when ready to ship
 - Multi-connection (`Connections[]`) behavior is frozen as the supported model: pairing Testing **adds/updates** a connection and must **not** wipe Production.
 - Later print work should start from 0.5.0.
 - Do **not** change dual-connection behavior unless there is a strong operational reason and an explicit review.
+
+## Feature Freeze (2026-07-18)
+
+Printing is **closed** for this phase:
+
+- No new print features.
+- No refactoring.
+- No Bridge / Dual Connections redesign.
+- Do **not** change `claim_print_jobs` or Bridge logic except for a confirmed bug.
+- Future incidents: **Hotfix only**, minimal diff, architecture untouched.
 
 ## Production promote checklist
 

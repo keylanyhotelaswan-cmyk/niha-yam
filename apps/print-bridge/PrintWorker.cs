@@ -153,6 +153,14 @@ public sealed class PrintWorker
     private CancellationTokenSource? _cts;
     private Task? _loop;
     private DateTimeOffset _lastEmptyClaimDiagAt = DateTimeOffset.MinValue;
+    private DateTimeOffset _lastConfigSaveAt = DateTimeOffset.MinValue;
+    private IReadOnlyList<WindowsPrinterInfo>? _printerCache;
+    private DateTimeOffset _printerCacheAt = DateTimeOffset.MinValue;
+    private static readonly TimeSpan PrinterCacheTtl = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan ConfigSaveMinInterval = TimeSpan.FromMinutes(1);
+
+    /// <summary>Last claim/diag line for Advanced diagnostics (support).</summary>
+    public string LastClaimSummary { get; private set; } = Ar.None;
 
     public event Action<BridgeLinkState>? StateChanged;
     public event Action<bool, string>? PrintFinished;
@@ -200,7 +208,7 @@ public sealed class PrintWorker
 
                 SetState(BridgeLinkState.Connecting);
                 var anyConnected = false;
-                var printers = WindowsPrinterInventory.Discover();
+                var printers = GetCachedPrinters();
 
                 foreach (var conn in paired)
                 {
@@ -224,9 +232,11 @@ public sealed class PrintWorker
 
                         await FlushOfflineAsync(api, conn.SupabaseUrl, ct);
                         var jobs = await api.ClaimAsync(10, ct);
-                        _log.Info(
+                        var claimLine =
                             $"[{envTag}] poll claim: found={jobs.Count} bridgeId={conn.BridgeId ?? "?"} " +
-                            $"tokenPrefix={(conn.BridgeToken is { Length: >= 8 } t ? t[..8] : "?")}");
+                            $"tokenPrefix={(conn.BridgeToken is { Length: >= 8 } t ? t[..8] : "?")}";
+                        _log.Info(claimLine);
+                        LastClaimSummary = $"{envTag}: found={jobs.Count}";
 
                         if (jobs.Count == 0)
                         {
@@ -237,6 +247,8 @@ public sealed class PrintWorker
                                 {
                                     var diag = await api.DiagnoseClaimAsync(ct);
                                     _log.Info($"[{envTag}] claim_diag: {diag}");
+                                    var shortDiag = diag.Length > 160 ? diag[..160] + "…" : diag;
+                                    LastClaimSummary = $"{envTag}: found=0 · {shortDiag}";
                                 }
                                 catch (Exception dex)
                                 {
@@ -250,6 +262,8 @@ public sealed class PrintWorker
                                 _log.Info(
                                     $"[{envTag}] claimed job {j.Reference ?? j.Id.ToString()} " +
                                     $"printerId={j.Printer?.Id} win={ResolvePrinterName(j)}");
+                            LastClaimSummary =
+                                $"{envTag}: found={jobs.Count} · {jobs[0].Reference ?? jobs[0].Id.ToString()}";
                         }
 
                         foreach (var job in jobs)
@@ -264,7 +278,7 @@ public sealed class PrintWorker
 
                 restarted = false;
                 ConfigStore.SyncLegacyFields(_cfg);
-                try { ConfigStore.Save(_cfg); } catch { /* ignore disk races */ }
+                MaybeSaveConfig();
 
                 SetState(anyConnected ? BridgeLinkState.Connected : BridgeLinkState.Disconnected);
             }
@@ -272,6 +286,32 @@ public sealed class PrintWorker
 
             try { await Task.Delay(_cfg.PollMs, ct); }
             catch (OperationCanceledException) { break; }
+        }
+    }
+
+    private IReadOnlyList<WindowsPrinterInfo> GetCachedPrinters()
+    {
+        if (_printerCache is not null &&
+            DateTimeOffset.UtcNow - _printerCacheAt < PrinterCacheTtl)
+            return _printerCache;
+
+        _printerCache = WindowsPrinterInventory.Discover();
+        _printerCacheAt = DateTimeOffset.UtcNow;
+        return _printerCache;
+    }
+
+    private void MaybeSaveConfig()
+    {
+        if (DateTimeOffset.UtcNow - _lastConfigSaveAt < ConfigSaveMinInterval)
+            return;
+        try
+        {
+            ConfigStore.Save(_cfg);
+            _lastConfigSaveAt = DateTimeOffset.UtcNow;
+        }
+        catch
+        {
+            /* ignore disk races */
         }
     }
 

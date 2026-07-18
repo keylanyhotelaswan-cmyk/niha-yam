@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import {
   copyFileSync,
   existsSync,
@@ -17,6 +17,11 @@ import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
  * so Print Center can offer: الإدارة → مركز الطباعة → تنزيل Bridge
  *
  *   pnpm bridge:publish
+ *
+ * Produces:
+ *   - niha-print-bridge-win-x64.zip  (auto-update package)
+ *   - NihaPrintBridge-Setup.exe      (Inno Setup, if ISCC available)
+ *   - bridge-manifest.json           (version, notes, setupUrl, url)
  */
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -27,6 +32,8 @@ const downloadsDir = path.join(root, 'public', 'downloads')
 const zipName = 'niha-print-bridge-win-x64.zip'
 const zipPath = path.join(downloadsDir, zipName)
 const stagingZipDir = path.join(root, 'apps', 'print-bridge', 'publish', 'stage')
+const issPath = path.join(root, 'apps', 'print-bridge', 'installer', 'NihaPrintBridge.iss')
+const changelogPath = path.join(root, 'apps', 'print-bridge', 'BRIDGE_CHANGELOG.md')
 
 const env = loadProjectEnv()
 const url = env.VITE_SUPABASE_URL
@@ -102,13 +109,16 @@ writeFileSync(
     'NIHA Print Bridge',
     `Version: ${version}`,
     '',
+    'Recommended: run NihaPrintBridge-Setup.exe from Print Center.',
+    '',
+    'Zip install (IT):',
     '1. Extract this zip on the Windows PC next to the printers.',
     '2. Run Niha.PrintBridge.exe (tray icon + Arabic window).',
-    '3. In admin: Print Center → Pair Bridge → create code / show QR.',
-    '4. Enter the pair code only (or Scan QR from clipboard image).',
-    '5. Choose a printer and run Test Print.',
+    '3. In admin: Print Center → Pair Bridge → copy Pairing Token or show QR.',
+    '4. In Bridge: Paste token (no camera) or Scan QR — short code is for first env only.',
     '',
-    'Logs (advanced): %LocalAppData%\\NihaPrintBridge\\bridge.log',
+    'Data (pairing survives updates): %LocalAppData%\\NihaPrintBridge\\',
+    'Logs: %LocalAppData%\\NihaPrintBridge\\bridge.log',
     '',
   ].join('\n'),
   'utf8',
@@ -132,7 +142,6 @@ for (const name of [
   copyFileSync(src, path.join(stageApp, name))
 }
 
-// Single-file publish may still emit .pdb — ignore. Copy pdb optional.
 const pdb = path.join(outDir, 'Niha.PrintBridge.pdb')
 if (existsSync(pdb)) copyFileSync(pdb, path.join(stageApp, 'Niha.PrintBridge.pdb'))
 
@@ -149,16 +158,56 @@ execFileSync(
   { stdio: 'inherit' },
 )
 
+const notes = readChangelogNotes(changelogPath, version)
+
+let setupFile = null
+let setupUrl = null
+const iscc = findIscc()
+if (iscc) {
+  console.log(`Building Setup.exe with ${iscc}…`)
+  const r = spawnSync(
+    iscc,
+    [
+      issPath,
+      `/DMyAppVersion=${version}`,
+      `/DMyPublishDir=${outDir}`,
+      `/DMyOutputDir=${downloadsDir}`,
+    ],
+    { encoding: 'utf8' },
+  )
+  if (r.status !== 0) {
+    console.warn('WARN: Inno Setup compile failed — zip still published.')
+    if (r.stdout) console.warn(r.stdout)
+    if (r.stderr) console.warn(r.stderr)
+  } else {
+    setupFile = 'NihaPrintBridge-Setup.exe'
+    setupUrl = `/downloads/${setupFile}`
+    const versioned = path.join(downloadsDir, `NihaPrintBridge-Setup-${version}.exe`)
+    const setupPath = path.join(downloadsDir, setupFile)
+    if (existsSync(setupPath)) {
+      copyFileSync(setupPath, versioned)
+      console.log(`OK: ${setupPath}`)
+    }
+  }
+} else {
+  console.warn(
+    'WARN: Inno Setup (ISCC.exe) not found — skipping Setup.exe. Install from https://jrsoftware.org/isinfo.php then re-run pnpm bridge:publish',
+  )
+}
+
 const sizeBytes = existsSync(zipPath) ? statSync(zipPath).size : null
 const manifest = {
   name: 'NIHA Print Bridge',
   version,
   file: zipName,
   url: `/downloads/${zipName}`,
+  setupFile,
+  setupUrl,
   platform: 'win-x64',
   selfContained: true,
   publishedAt: new Date().toISOString(),
   sizeBytes,
+  notes,
 }
 
 writeFileSync(
@@ -170,4 +219,43 @@ writeFileSync(
 console.log(`\nOK: ${zipPath}`)
 console.log(`Build output: ${outDir}`)
 console.log(`Manifest: public/downloads/bridge-manifest.json (v${version})`)
-console.log(`Print Center download path: ${manifest.url}`)
+console.log(`Print Center zip: ${manifest.url}`)
+if (setupUrl) console.log(`Print Center setup: ${setupUrl}`)
+
+function readChangelogNotes(file, ver) {
+  if (!existsSync(file)) return `NIHA Print Bridge ${ver}`
+  const text = readFileSync(file, 'utf8')
+  const re = new RegExp(
+    `##\\s*${ver.replace(/\./g, '\\.')}\\s*\\n([\\s\\S]*?)(?=\\n##\\s|$)`,
+  )
+  const m = text.match(re)
+  if (!m) return `NIHA Print Bridge ${ver}`
+  return m[1]
+    .split('\n')
+    .map((l) => l.replace(/^[-*]\s*/, '').trim())
+    .filter(Boolean)
+    .join('\n')
+}
+
+function findIscc() {
+  const localApp = process.env.LOCALAPPDATA || ''
+  const candidates = [
+    process.env.INNO_SETUP_ISCC,
+    'C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe',
+    'C:\\Program Files\\Inno Setup 6\\ISCC.exe',
+    localApp ? path.join(localApp, 'Programs', 'Inno Setup 6', 'ISCC.exe') : null,
+  ].filter(Boolean)
+  for (const c of candidates) {
+    if (existsSync(c)) return c
+  }
+  const which = spawnSync(
+    'where.exe',
+    ['ISCC.exe'],
+    { encoding: 'utf8' },
+  )
+  if (which.status === 0) {
+    const line = which.stdout.split(/\r?\n/).map((s) => s.trim()).find(Boolean)
+    if (line && existsSync(line)) return line
+  }
+  return null
+}

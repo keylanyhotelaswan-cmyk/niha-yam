@@ -1,10 +1,13 @@
 {
   "name": "NIHA Print Bridge",
-  "version": "0.5.0",
+  "version": "0.5.3",
   "file": "niha-print-bridge-win-x64.zip",
   "url": "/downloads/niha-print-bridge-win-x64.zip",
+  "setupFile": "NihaPrintBridge-Setup.exe",
+  "setupUrl": "/downloads/NihaPrintBridge-Setup.exe",
   "platform": "win-x64",
   "selfContained": true,
-  "publishedAt": "2026-07-17T19:58:05.754Z",
-  "sizeBytes": 67030615
+  "publishedAt": "2026-07-18T11:54:06.816Z",
+  "sizeBytes": 67031841,
+  "notes": "إصلاح ربط البيئة الثانية: لصق رمز الربط الكامل أو مسح QR يعملان بشكل صحيح\nدعم رمز الربط الكامل (base64) بدون كاميرا — معادل لـ QR\nتسريع دورة الطباعة: تخزين مؤقت لاكتشاف الطابعات وتقليل كتابة الإعدادات\nواجهة تحديث احترافية: ما الجديد + شريط تقدم + إعادة تشغيل تلقائية\nمثبّت Windows (Setup) مع اختصارات سطح المكتب وقائمة ابدأ"
 }

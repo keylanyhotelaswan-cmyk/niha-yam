@@ -21,7 +21,10 @@ public static class BridgeUpdater
         public string? Version { get; set; }
         public string? File { get; set; }
         public string? Url { get; set; }
+        public string? SetupUrl { get; set; }
+        public string? SetupFile { get; set; }
         public long? SizeBytes { get; set; }
+        public string? Notes { get; set; }
     }
 
     public sealed class CheckResult
@@ -106,6 +109,7 @@ public static class BridgeUpdater
     public static async Task<(bool ok, string message)> DownloadAndApplyAsync(
         BridgeConfig cfg,
         Manifest manifest,
+        IProgress<(string status, int percent)>? progress = null,
         CancellationToken ct = default)
     {
         var origin = ResolveOrigin(cfg);
@@ -126,19 +130,40 @@ public static class BridgeUpdater
                 ? manifest.Url
                 : $"{origin}{manifest.Url}";
 
+            progress?.Report((string.Format(Ar.UpdateDownloading, 0), 0));
+
             using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
+            using var res = await http.GetAsync(zipUrl, HttpCompletionOption.ResponseHeadersRead, ct);
+            res.EnsureSuccessStatusCode();
+            var total = res.Content.Headers.ContentLength ?? manifest.SizeBytes ?? -1L;
             await using (var fs = File.Create(zipPath))
+            await using (var stream = await res.Content.ReadAsStreamAsync(ct))
             {
-                using var stream = await http.GetStreamAsync(zipUrl, ct);
-                await stream.CopyToAsync(fs, ct);
+                var buffer = new byte[81920];
+                long readTotal = 0;
+                int read;
+                while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+                {
+                    await fs.WriteAsync(buffer.AsMemory(0, read), ct);
+                    readTotal += read;
+                    if (total > 0)
+                    {
+                        var pct = (int)Math.Min(90, readTotal * 90 / total);
+                        progress?.Report((string.Format(Ar.UpdateDownloading, pct), pct));
+                    }
+                }
             }
 
+            progress?.Report((Ar.UpdateVerifying, 92));
             ZipFile.ExtractToDirectory(zipPath, extractDir);
 
             var srcDir = FindPublishedFolder(extractDir);
             if (srcDir is null)
                 return (false, Ar.UpdateBadPackage);
 
+            progress?.Report((Ar.UpdateInstalling, 96));
+
+            // Install dir only — never touch %LocalAppData%\NihaPrintBridge data.
             var destDir = Path.GetDirectoryName(Application.ExecutablePath)
                 ?? AppContext.BaseDirectory;
             var script = Path.Combine(updatesDir, "apply-update.cmd");
@@ -154,6 +179,8 @@ if errorlevel 1 exit /b 1
 start "" "{destEsc}\{exeName}"
 """, System.Text.Encoding.Default);
 
+            progress?.Report((Ar.UpdateRestarting, 100));
+
             var psi = new ProcessStartInfo
             {
                 FileName = script,
@@ -162,6 +189,10 @@ start "" "{destEsc}\{exeName}"
                 WindowStyle = ProcessWindowStyle.Hidden,
             };
             Process.Start(psi);
+
+            // Refresh autostart to the same install path after restart.
+            try { Autostart.ApplyFromConfig(cfg); } catch { /* ignore */ }
+
             return (true, Ar.UpdateApplying);
         }
         catch (Exception ex)

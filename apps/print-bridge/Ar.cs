@@ -11,17 +11,27 @@ public static class Ar
     public const string Close = "إغلاق";
     public const string Save = "حفظ";
     public const string PairCode = "رمز الاقتران";
-    public const string PairHint = "أدخل الرمز الظاهر في مركز الطباعة، أو امسح رمز QR.";
+    public const string PairHint =
+        "الصق رمز الربط الكامل أو امسح QR — الرمز القصير يكفي لبيئة واحدة فقط (الإنتاج عادة).";
     public const string PairSuccess = "تم الاقتران بنجاح";
     public const string PairFailed = "فشل الاقتران";
     public const string Pairing = "جاري الاقتران…";
+    public const string PairReadyEnvFmt = "جاهز للربط: {0}";
     public const string ScanQr = "مسح QR";
-    public const string ScanQrHint = "انسخ صورة رمز QR إلى الحافظة (Win+Shift+S) ثم اضغط مسح QR.";
+    public const string ScanQrHint =
+        "بدون كاميرا: انسخ «رمز الربط الكامل» من مركز الطباعة ثم الصق الرمز.\n" +
+        "أو انسخ صورة QR إلى الحافظة (Win+Shift+S) ثم اضغط مسح QR.";
     public const string PasteCode = "لصق الرمز";
-    public const string EnterCode = "أدخل رمز الاقتران هنا";
+    public const string EnterCode = "رمز الربط الكامل أو الرمز القصير";
     public const string MissingCloudConfig =
         "ملف الإعدادات غير موجود. أعد تنزيل البرنامج من مركز الطباعة داخل الإدارة.";
+    public const string MissingCloudConfigHint =
+        "الصق رمز الربط الكامل من مركز الطباعة (يحتوي على بيانات الاتصال).";
     public const string InvalidCode = "رمز الاقتران غير صالح";
+    public const string NeedQrForSecondEnv =
+        "لا يمكن استخدام الرمز المختصر عند ربط بيئة إضافية.\n\n" +
+        "الصق «رمز الربط الكامل» أو امسح رمز QR — كلاهما يحتوي على عنوان السحابة. " +
+        "الرمز القصير وحده لا يكفي ويُربَط بالإنتاج الحالي فقط.";
 
     public const string Connecting = "جاري الاتصال";
     public const string Connected = "متصل";
@@ -30,10 +40,13 @@ public static class Ar
     public const string Paired = "مقترن";
 
     public const string DeviceName = "اسم الجهاز";
-    public const string Restaurant = "البيئة / المطعم";
+    public const string Restaurant = "الاتصالات";
+    public const string ConnectionsTitle = "الاتصالات";
     public const string EnvProduction = "إنتاج";
     public const string EnvTesting = "اختبار";
     public const string EnvUnknown = "بيئة";
+    public const string ConnOnline = "متصل";
+    public const string ConnOffline = "غير متصل";
     public const string Printers = "الطابعات";
     public const string NoPrinters = "لا توجد طابعات مثبتة على هذا الجهاز";
     public const string TestPrint = "اختبار محلي (تشخيص)";
@@ -64,6 +77,13 @@ public static class Ar
     public const string UpdateFail = "فشل التحديث";
     public const string UpdateConfirm =
         "سيتم تنزيل الإصدار الجديد وإعادة تشغيل البرنامج. المتابعة؟";
+    public const string UpdateLater = "لاحقاً";
+    public const string UpdateWhatsNew = "ما الجديد";
+    public const string UpdateDownloading = "جاري التنزيل… {0}%";
+    public const string UpdateVerifying = "جاري التحقق من الحزمة…";
+    public const string UpdateInstalling = "جاري التثبيت…";
+    public const string UpdateRestarting = "جاري إعادة التشغيل…";
+    public const string UpdateTitle = "تحديث NIHA Print Bridge";
     public const string Settings = "إعدادات الجهاز";
 
     public const string Advanced = "التشخيص المتقدم";
@@ -71,6 +91,9 @@ public static class Ar
     public const string Version = "الإصدار";
     public const string BridgeId = "معرّف الجسر";
     public const string Heartbeat = "آخر نبضة";
+    public const string LastClaim = "آخر مطالبة";
+    public const string InstallPath = "مسار التثبيت";
+    public const string DataPath = "مسار البيانات";
     public const string OpenLogs = "فتح مجلد السجلات";
     public const string TechNote = "للدعم الفني فقط — لا يحتاجها مدير المطعم.";
 

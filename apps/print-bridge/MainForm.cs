@@ -20,6 +20,9 @@ public sealed class MainForm : Form
     private Label _advVersion = null!;
     private Label _advBridgeId = null!;
     private Label _advHeartbeat = null!;
+    private Label _advLastClaim = null!;
+    private Label _advInstallPath = null!;
+    private Label _advDataPath = null!;
     private readonly Button _advancedToggle;
     private bool _advancedOpen;
     private CheckBox _chkAutostart = null!;
@@ -56,14 +59,14 @@ public sealed class MainForm : Form
 
         var statusCard = NihaTheme.Card();
         statusCard.Dock = DockStyle.Top;
-        statusCard.Height = 150;
+        statusCard.Height = 200;
         statusCard.Padding = new Padding(16);
         PaintBorder(statusCard);
 
         _linkStatus = Row(statusCard, Ar.Status, Ar.Connecting, 8);
         _pairStatus = Row(statusCard, Ar.Paired, Ar.NotPaired, 40);
         _device = Row(statusCard, Ar.DeviceName, Environment.MachineName, 72);
-        _restaurant = Row(statusCard, Ar.Restaurant, cfg.RestaurantName ?? Ar.None, 104);
+        _restaurant = Row(statusCard, Ar.ConnectionsTitle, FormatEnvironments(), 104, multiline: true);
 
         var printersCard = NihaTheme.Card();
         printersCard.Dock = DockStyle.Top;
@@ -166,7 +169,7 @@ public sealed class MainForm : Form
         _advancedPanel = BuildAdvanced();
         _advancedPanel.Dock = DockStyle.Top;
         _advancedPanel.Visible = false;
-        _advancedPanel.Height = 200;
+        _advancedPanel.Height = 320;
 
         var stack = new TableLayoutPanel
         {
@@ -374,9 +377,13 @@ public sealed class MainForm : Form
             ForeColor = NihaTheme.Muted,
             Font = NihaTheme.UiFont(8.5f),
         };
-        _advVersion = Row(p, Ar.Version, typeof(MainForm).Assembly.GetName().Version?.ToString() ?? "0.2.0", 36);
+        var installDir = Path.GetDirectoryName(Application.ExecutablePath) ?? AppContext.BaseDirectory;
+        _advVersion = Row(p, Ar.Version, typeof(MainForm).Assembly.GetName().Version?.ToString(3) ?? "0.5.3", 36);
         _advBridgeId = Row(p, Ar.BridgeId, ShortId(_cfg.BridgeId), 68);
         _advHeartbeat = Row(p, Ar.Heartbeat, Ar.None, 100);
+        _advLastClaim = Row(p, Ar.LastClaim, _worker.LastClaimSummary, 132, multiline: true);
+        _advInstallPath = Row(p, Ar.InstallPath, installDir, 180, multiline: true);
+        _advDataPath = Row(p, Ar.DataPath, ConfigStore.Dir, 228, multiline: true);
 
         var openLogs = NihaTheme.OutlineButton(Ar.OpenLogs);
         openLogs.Dock = DockStyle.Bottom;
@@ -414,11 +421,16 @@ public sealed class MainForm : Form
         p.Controls.Add(localTest);
         p.Controls.Add(openLogs);
         p.Controls.Add(note);
-        p.Height = 200;
+        p.Height = 320;
         return p;
     }
 
-    private static Label Row(Control parent, string label, string value, int top)
+    private static Label Row(
+        Control parent,
+        string label,
+        string value,
+        int top,
+        bool multiline = false)
     {
         var l = new Label
         {
@@ -434,9 +446,11 @@ public sealed class MainForm : Form
             Text = value,
             Left = 140,
             Top = top,
-            Width = 300,
+            Width = 320,
             Font = NihaTheme.UiFont(10f, FontStyle.Bold),
-            AutoEllipsis = true,
+            AutoEllipsis = !multiline,
+            AutoSize = false,
+            Height = multiline ? 72 : 22,
         };
         parent.Controls.Add(l);
         parent.Controls.Add(v);
@@ -544,6 +558,7 @@ public sealed class MainForm : Form
             _advHeartbeat.Text = _cfg.LastHeartbeatAt is { } hb
                 ? hb.ToLocalTime().ToString("g")
                 : Ar.None;
+            _advLastClaim.Text = _worker.LastClaimSummary;
         }
     }
 
@@ -557,6 +572,9 @@ public sealed class MainForm : Form
     private string FormatEnvironments()
     {
         var parts = _cfg.PairedConnections()
+            .OrderBy(c =>
+                string.Equals(c.Env, "production", StringComparison.OrdinalIgnoreCase) ? 0 :
+                string.Equals(c.Env, "testing", StringComparison.OrdinalIgnoreCase) ? 1 : 2)
             .Select(c =>
             {
                 var env = c.Env switch
@@ -565,12 +583,19 @@ public sealed class MainForm : Form
                     "testing" => Ar.EnvTesting,
                     _ => Ar.EnvUnknown,
                 };
-                var name = string.IsNullOrWhiteSpace(c.RestaurantName) ? env : $"{env}: {c.RestaurantName}";
-                return name;
+                var online = c.LastHeartbeatAt is { } hb &&
+                    (DateTimeOffset.Now - hb).TotalSeconds < 60 &&
+                    string.IsNullOrWhiteSpace(c.LastError);
+                var mark = online ? "[ON]" : "[OFF]";
+                var status = online ? Ar.ConnOnline : Ar.ConnOffline;
+                var name = string.IsNullOrWhiteSpace(c.RestaurantName)
+                    ? ""
+                    : $" — {c.RestaurantName}";
+                return $"{mark} {env}{name} ({status})";
             })
             .ToList();
         if (parts.Count == 0) return Ar.None;
-        return string.Join(" · ", parts);
+        return string.Join(Environment.NewLine, parts);
     }
 
     private void RequestRePair()

@@ -10,6 +10,7 @@ public sealed class PairForm : Form
     private readonly Label _status;
     private readonly Button _pairBtn;
     private bool _busy;
+    private PairingHelper.ParsedPair? _pending;
 
     public bool PairedOk { get; private set; }
 
@@ -18,8 +19,8 @@ public sealed class PairForm : Form
         _cfg = cfg;
         NihaTheme.ApplyForm(this);
         Text = Ar.Pair;
-        Width = 440;
-        Height = 420;
+        Width = 460;
+        Height = 460;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -39,7 +40,7 @@ public sealed class PairForm : Form
         {
             Text = Ar.PairHint,
             AutoSize = false,
-            Height = 44,
+            Height = 56,
             Dock = DockStyle.Top,
             ForeColor = NihaTheme.Muted,
             Font = NihaTheme.UiFont(9.5f),
@@ -57,15 +58,19 @@ public sealed class PairForm : Form
         _code = new TextBox
         {
             Dock = DockStyle.Top,
-            Height = 40,
-            Font = NihaTheme.UiFont(16f, FontStyle.Bold),
+            Height = 72,
+            Font = NihaTheme.UiFont(12f, FontStyle.Bold),
             TextAlign = HorizontalAlignment.Center,
             PlaceholderText = Ar.EnterCode,
-            MaxLength = 64,
+            Multiline = true,
+            AcceptsReturn = false,
+            ScrollBars = ScrollBars.Vertical,
+            // Full Pairing Token / JSON — never truncate.
+            MaxLength = 0,
         };
         _code.KeyDown += (_, e) =>
         {
-            if (e.KeyCode == Keys.Enter)
+            if (e.KeyCode == Keys.Enter && !e.Shift)
             {
                 e.SuppressKeyPress = true;
                 _ = DoPairAsync();
@@ -82,26 +87,27 @@ public sealed class PairForm : Form
         };
 
         _pairBtn = NihaTheme.PrimaryButton(Ar.Pair);
-        _pairBtn.Width = 120;
+        _pairBtn.Width = 100;
         _pairBtn.Click += async (_, _) => await DoPairAsync();
 
-        var scanBtn = NihaTheme.OutlineButton(Ar.ScanQr);
-        scanBtn.Width = 120;
-        scanBtn.Click += (_, _) => ScanQrFromClipboard();
-
-        var pasteBtn = NihaTheme.OutlineButton(Ar.PasteCode);
-        pasteBtn.Width = 120;
+        var pasteBtn = NihaTheme.PrimaryButton(Ar.PasteCode);
+        pasteBtn.Width = 110;
         pasteBtn.Click += (_, _) => PasteCode();
 
+        var scanBtn = NihaTheme.OutlineButton(Ar.ScanQr);
+        scanBtn.Width = 100;
+        scanBtn.Click += (_, _) => ScanQrFromClipboard();
+
+        // RTL Flow: first added appears on the right — Pair, Paste, Scan
         actions.Controls.Add(_pairBtn);
-        actions.Controls.Add(scanBtn);
         actions.Controls.Add(pasteBtn);
+        actions.Controls.Add(scanBtn);
 
         var scanHint = new Label
         {
             Text = Ar.ScanQrHint,
             Dock = DockStyle.Top,
-            Height = 40,
+            Height = 48,
             ForeColor = NihaTheme.Muted,
             Font = NihaTheme.UiFont(8.5f),
         };
@@ -109,16 +115,16 @@ public sealed class PairForm : Form
         _status = new Label
         {
             Dock = DockStyle.Top,
-            Height = 28,
+            Height = 36,
             ForeColor = NihaTheme.Muted,
             TextAlign = ContentAlignment.MiddleCenter,
         };
 
         if (!PairingHelper.HasCloudDefaults(_cfg))
         {
-            _status.Text = Ar.MissingCloudConfig;
-            _status.ForeColor = NihaTheme.Danger;
-            _pairBtn.Enabled = false;
+            _status.Text = Ar.MissingCloudConfigHint;
+            _status.ForeColor = NihaTheme.Warning;
+            // Keep Pair enabled — full Pairing Token supplies url/anon.
         }
 
         // Add in reverse for Dock Top
@@ -162,7 +168,6 @@ public sealed class PairForm : Form
             Size = new Size(40, 40),
             Location = new Point(16, 16),
         };
-        // RTL: place logo on the right visually via Dock
         logo.Dock = DockStyle.Right;
         var title = new Label
         {
@@ -178,6 +183,18 @@ public sealed class PairForm : Form
         return p;
     }
 
+    private void ApplyPending(PairingHelper.ParsedPair parsed)
+    {
+        _pending = parsed;
+        // Show short code only — never raw JSON/token in the box after successful parse.
+        _code.Text = parsed.Code;
+        var env = PairingHelper.EnvLabel(parsed);
+        _status.Text = string.IsNullOrWhiteSpace(parsed.Url)
+            ? ""
+            : string.Format(Ar.PairReadyEnvFmt, env);
+        _status.ForeColor = NihaTheme.Success;
+    }
+
     private void PasteCode()
     {
         try
@@ -190,10 +207,7 @@ public sealed class PairForm : Form
                 _status.ForeColor = NihaTheme.Danger;
                 return;
             }
-            // Show only the code — never JSON
-            _code.Text = parsed.Code;
-            PairingHelper.UpsertConnection(_cfg, parsed);
-            _status.Text = "";
+            ApplyPending(parsed);
         }
         catch
         {
@@ -234,10 +248,7 @@ public sealed class PairForm : Form
                 return;
             }
 
-            _code.Text = parsed.Code;
-            PairingHelper.UpsertConnection(_cfg, parsed);
-            _status.Text = "";
-            _status.ForeColor = NihaTheme.Muted;
+            ApplyPending(parsed);
         }
         catch (Exception ex)
         {
@@ -246,18 +257,58 @@ public sealed class PairForm : Form
         }
     }
 
+    private PairingHelper.ParsedPair? ResolveParsed()
+    {
+        // Full payload still in the box (JSON / Pairing Token).
+        if (PairingHelper.TryParseInput(_code.Text, out var fromBox) &&
+            !string.IsNullOrWhiteSpace(fromBox.Url))
+            return fromBox;
+
+        // After Paste/Scan we show only the short code — keep pending url/anon.
+        if (_pending is { } pending && !string.IsNullOrWhiteSpace(pending.Url))
+        {
+            if (string.IsNullOrWhiteSpace(_code.Text) ||
+                string.Equals(_code.Text.Trim(), pending.Code, StringComparison.OrdinalIgnoreCase))
+                return pending;
+        }
+
+        if (PairingHelper.TryParseInput(_code.Text, out var parsed))
+            return parsed;
+
+        return _pending;
+    }
+
     private async Task DoPairAsync()
     {
         if (_busy) return;
-        if (!PairingHelper.TryParseInput(_code.Text, out var parsed))
+
+        var parsed = ResolveParsed();
+        if (parsed is null)
         {
-            // Also try applying clipboard-style if user typed JSON somehow — still only show code
             _status.Text = Ar.InvalidCode;
             _status.ForeColor = NihaTheme.Danger;
             return;
         }
 
-        var conn = PairingHelper.UpsertConnection(_cfg, parsed);
+        if (PairingHelper.RequiresPayloadForSecondEnv(_cfg, parsed))
+        {
+            _status.Text = Ar.NeedQrForSecondEnv;
+            _status.ForeColor = NihaTheme.Danger;
+            return;
+        }
+
+        BridgeConnection conn;
+        try
+        {
+            conn = PairingHelper.UpsertConnection(_cfg, parsed);
+        }
+        catch (Exception ex)
+        {
+            _status.Text = FriendlyError(ex.Message);
+            _status.ForeColor = NihaTheme.Danger;
+            return;
+        }
+
         if (!PairingHelper.HasCloudDefaults(_cfg, parsed))
         {
             _status.Text = Ar.MissingCloudConfig;
@@ -273,7 +324,7 @@ public sealed class PairForm : Form
         try
         {
             var api = new SupabaseBridgeApi(conn);
-            var version = typeof(PairForm).Assembly.GetName().Version?.ToString() ?? "0.5.0";
+            var version = typeof(PairForm).Assembly.GetName().Version?.ToString(3) ?? "0.5.3";
             var result = await api.PairAsync(
                 parsed.Code,
                 Environment.MachineName,
@@ -290,7 +341,6 @@ public sealed class PairForm : Form
                 !string.IsNullOrWhiteSpace(rn.GetString()))
                 conn.RestaurantName = rn.GetString();
             conn.Env = BridgeConnection.DetectEnv(conn.SupabaseUrl);
-            // Do not invent a placeholder name — wait for heartbeat if missing
 
             ConfigStore.Save(_cfg);
             PairedOk = true;

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { toast } from 'sonner'
-import { buildPairPayload } from '@/features/print/bridge-download'
+import {
+  buildPairPayload,
+  buildPairingToken,
+} from '@/features/print/bridge-download'
 import { formatWhen } from '@/features/print/components/print-labels'
 import { useCreatePairCode } from '@/features/print/hooks/usePrintMutations'
 import type { PairCodeResult } from '@/features/print/types'
@@ -15,6 +18,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui/dialog'
+import { isTestingEnv } from '@/shared/config/appEnv'
 import { t } from '@/shared/i18n'
 
 type Props = {
@@ -60,6 +64,16 @@ export function PairBridgeDialog({ open, onOpenChange }: Props) {
     })
   }
 
+  async function copyToken() {
+    if (!result?.code) return
+    try {
+      await navigator.clipboard.writeText(buildPairingToken(result.code))
+      toast.success(t.print.pair.tokenCopied)
+    } catch {
+      toast.error(t.print.errors.generic)
+    }
+  }
+
   async function copyCode() {
     if (!result?.code) return
     try {
@@ -89,6 +103,11 @@ export function PairBridgeDialog({ open, onOpenChange }: Props) {
 
         <div className="space-y-4">
           <p className="text-muted-foreground text-sm">{t.print.pair.hint}</p>
+          {isTestingEnv() ? (
+            <p className="text-amber-800 dark:text-amber-200 text-xs font-medium">
+              {t.print.session.pairOnceHint}
+            </p>
+          ) : null}
           {error ? (
             <Alert variant="destructive">
               <AlertDescription>{error}</AlertDescription>
@@ -104,17 +123,30 @@ export function PairBridgeDialog({ open, onOpenChange }: Props) {
                   className="mx-auto size-[220px] rounded-md bg-white p-2"
                 />
               ) : null}
+              <p className="text-muted-foreground text-xs">{t.print.pair.qrHint}</p>
+
+              <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+                <Button type="button" size="sm" onClick={() => void copyToken()}>
+                  {t.print.pair.copyToken}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={copyCode}
+                >
+                  {t.print.pair.copy}
+                </Button>
+              </div>
+
               <p className="text-muted-foreground text-xs">{t.print.pair.code}</p>
-              <p className="font-mono text-3xl font-bold tracking-widest">
+              <p className="font-mono text-2xl font-bold tracking-widest">
                 {result.code}
               </p>
               <p className="text-muted-foreground text-xs">
                 {t.print.pair.expires}: {formatWhen(result.expires_at)}
               </p>
-              <Button type="button" variant="outline" size="sm" onClick={copyCode}>
-                {t.print.pair.copy}
-              </Button>
-              <p className="text-muted-foreground text-xs">{t.print.pair.qrHint}</p>
+              <p className="text-muted-foreground text-xs">{t.print.pair.tokenHint}</p>
 
               <div className="border-t pt-3 text-start">
                 <Button
