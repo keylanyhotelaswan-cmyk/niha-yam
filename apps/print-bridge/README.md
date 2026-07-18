@@ -67,10 +67,10 @@ Tray → **التشغيل مع Windows**.
 
 ## Manage connections (cashier PCs)
 
-Main window or tray → **إدارة الاتصالات**:
-- Per-env: reconnect / delete / set default
-- **إعادة ضبط الاتصالات** — clears `Connections[]` only (keeps autostart, update prefs, install path)
-- Per-env diagnostics: Last Poll · Claim count · Print result · Reason · pipeline
+Main window or tray → **إدارة الاتصالات** (also via «ربط بيئة» when already paired):
+- Per-env: **إعادة الاقتران** (clears that env’s token only) / delete / set default
+- **إضافة بيئة جديدة** · **إعادة ضبط الاتصالات** (all connections only)
+- Diagnostics: Last Poll · Claim · received/printed totals · last error · pipeline
 
 ## About / support diagnostics
 

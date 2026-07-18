@@ -1,13 +1,13 @@
 {
   "name": "NIHA Print Bridge",
-  "version": "0.5.5",
+  "version": "0.5.6",
   "file": "niha-print-bridge-win-x64.zip",
   "url": "/downloads/niha-print-bridge-win-x64.zip",
   "setupFile": "NihaPrintBridge-Setup.exe",
   "setupUrl": "/downloads/NihaPrintBridge-Setup.exe",
   "platform": "win-x64",
   "selfContained": true,
-  "publishedAt": "2026-07-18T13:06:31.920Z",
-  "sizeBytes": 67047343,
-  "notes": "شاشة إدارة الاتصالات: إعادة اتصال / حذف / تعيين افتراضي\nإعادة ضبط الاتصالات فقط (بدون حذف الإعدادات أو الطابعات)\nتشخيص لكل بيئة: Last Poll · Claim · Print · Reason · مسار الدورة"
+  "publishedAt": "2026-07-18T13:32:13.717Z",
+  "sizeBytes": 67046578,
+  "notes": "إعادة اقتران لكل بيئة بدون لمس البيئات الأخرى\nمعالج إدارة اتصالات أوضح + إضافة بيئة\nإصلاح فشل Pairing Token (مسافات/أسطر) ورسائل خطأ كاملة + نسخ التفاصيل\nتشخيص: مستلمة / مطبوعة / آخر خطأ لكل اتصال"
 }

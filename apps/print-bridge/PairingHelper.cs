@@ -17,16 +17,17 @@ public static class PairingHelper
     {
         parsed = new ParsedPair("", null, null, null, null);
         if (string.IsNullOrWhiteSpace(raw)) return false;
-        var text = raw.Trim();
+        var text = raw.Trim().Trim('\uFEFF');
 
         if (text.StartsWith('{'))
             return TryParseJson(text, out parsed);
 
-        // Pairing Token: single-line base64url of the same JSON as QR.
-        if (TryDecodeBase64UrlJson(text, out var json) && TryParseJson(json, out parsed))
+        // Pairing Token may arrive with newlines/spaces from messaging apps.
+        var compact = new string(text.Where(c => !char.IsWhiteSpace(c)).ToArray());
+        if (TryDecodeBase64UrlJson(compact, out var json) && TryParseJson(json, out parsed))
             return true;
 
-        // Plain pair code
+        // Plain pair code (ignore spaces/dashes)
         var cleaned = new string(text.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();
         if (cleaned.Length < 6) return false;
         parsed = new ParsedPair(cleaned, null, null, null, null);
@@ -59,7 +60,6 @@ public static class PairingHelper
     private static bool TryDecodeBase64UrlJson(string text, out string json)
     {
         json = "";
-        // Short codes are short alnum; tokens are long base64url.
         if (text.Length < 24) return false;
         if (text.Any(ch => !(char.IsLetterOrDigit(ch) || ch is '-' or '_' or '=')))
             return false;
@@ -73,7 +73,7 @@ public static class PairingHelper
                 case 3: s += "="; break;
             }
             var bytes = Convert.FromBase64String(s);
-            json = Encoding.UTF8.GetString(bytes).Trim();
+            json = Encoding.UTF8.GetString(bytes).Trim().Trim('\uFEFF');
             return json.StartsWith('{');
         }
         catch
@@ -95,11 +95,19 @@ public static class PairingHelper
         };
     }
 
-    public static bool HasCloudDefaults(BridgeConfig cfg, ParsedPair? parsed = null)
+    public static bool HasCloudDefaults(
+        BridgeConfig cfg,
+        ParsedPair? parsed = null,
+        BridgeConnection? forceTarget = null)
     {
         if (parsed is { } p &&
             !string.IsNullOrWhiteSpace(p.Url) &&
             !string.IsNullOrWhiteSpace(p.AnonKey))
+            return true;
+
+        if (forceTarget is not null &&
+            !string.IsNullOrWhiteSpace(forceTarget.SupabaseUrl) &&
+            !string.IsNullOrWhiteSpace(forceTarget.AnonKey))
             return true;
 
         var target = ResolveTargetConnection(cfg, parsed);
@@ -108,12 +116,15 @@ public static class PairingHelper
     }
 
     /// <summary>
-    /// True when the operator already has at least one paired env and the input
-    /// is only a short code (no URL). Dual-env requires QR/payload so we know
-    /// which Supabase project to add — otherwise we would overwrite Production.
+    /// Short code alone is not enough when adding a *different* env.
+    /// Re-pair of a known target (forceTarget) allows short code.
     /// </summary>
-    public static bool RequiresPayloadForSecondEnv(BridgeConfig cfg, ParsedPair parsed)
+    public static bool RequiresPayloadForSecondEnv(
+        BridgeConfig cfg,
+        ParsedPair parsed,
+        BridgeConnection? forceTarget = null)
     {
+        if (forceTarget is not null) return false;
         ConfigStore.Normalize(cfg);
         if (!string.IsNullOrWhiteSpace(parsed.Url)) return false;
         return cfg.PairedConnections().Any();
@@ -121,32 +132,53 @@ public static class PairingHelper
 
     /// <summary>
     /// Upsert connection for the pair target URL without removing other envs.
-    /// Re-pairing Testing adds/updates Testing; Production stays intact.
-    /// Plain pair codes (no URL) only allowed for the first connection.
+    /// When <paramref name="forceTarget"/> is set (Re-Pair), short codes update that connection only.
     /// </summary>
-    public static BridgeConnection UpsertConnection(BridgeConfig cfg, ParsedPair parsed)
+    public static BridgeConnection UpsertConnection(
+        BridgeConfig cfg,
+        ParsedPair parsed,
+        BridgeConnection? forceTarget = null)
     {
         ConfigStore.Normalize(cfg);
 
-        if (RequiresPayloadForSecondEnv(cfg, parsed))
+        if (RequiresPayloadForSecondEnv(cfg, parsed, forceTarget))
             throw new InvalidOperationException(Ar.NeedQrForSecondEnv);
 
-        var url = !string.IsNullOrWhiteSpace(parsed.Url)
-            ? parsed.Url!
-            : cfg.PrimaryConnection()?.SupabaseUrl ?? cfg.SupabaseUrl;
+        string url;
+        if (!string.IsNullOrWhiteSpace(parsed.Url))
+            url = parsed.Url!;
+        else if (forceTarget is not null && !string.IsNullOrWhiteSpace(forceTarget.SupabaseUrl))
+            url = forceTarget.SupabaseUrl;
+        else
+            url = cfg.PrimaryConnection()?.SupabaseUrl ?? cfg.SupabaseUrl;
 
         if (string.IsNullOrWhiteSpace(url))
             throw new InvalidOperationException(Ar.MissingCloudConfig);
 
-        var conn = cfg.FindByUrl(url);
-        if (conn is null)
+        // Re-pair: if token URL disagrees with forceTarget, prefer payload URL (correct env).
+        BridgeConnection conn;
+        if (forceTarget is not null &&
+            (string.IsNullOrWhiteSpace(parsed.Url) ||
+             BridgeConnection.UrlsMatch(forceTarget.SupabaseUrl, parsed.Url)))
         {
-            conn = new BridgeConnection
+            conn = forceTarget;
+        }
+        else
+        {
+            var existing = cfg.FindByUrl(url);
+            if (existing is null)
             {
-                SupabaseUrl = url,
-                AnonKey = parsed.AnonKey ?? cfg.AnonKey ?? "",
-            };
-            cfg.Connections.Add(conn);
+                conn = new BridgeConnection
+                {
+                    SupabaseUrl = url,
+                    AnonKey = parsed.AnonKey ?? cfg.AnonKey ?? "",
+                };
+                cfg.Connections.Add(conn);
+            }
+            else
+            {
+                conn = existing;
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(parsed.Url))
@@ -190,7 +222,12 @@ public static class PairingHelper
         };
     }
 
-    [Obsolete("Use UpsertConnection")]
-    public static void ApplyParsed(BridgeConfig cfg, ParsedPair parsed) =>
-        UpsertConnection(cfg, parsed);
+    /// <summary>Strip pairing credentials for one connection — keep URL/anon for Re-Pair with short code.</summary>
+    public static void ClearPairingCredentials(BridgeConnection conn)
+    {
+        conn.BridgeToken = null;
+        conn.BridgeId = null;
+        conn.LastHeartbeatAt = null;
+        conn.LastError = null;
+    }
 }

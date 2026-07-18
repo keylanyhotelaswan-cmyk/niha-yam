@@ -55,7 +55,9 @@ public static class DiagnosticsReport
                 sb.AppendLine($"- {env}{name} {mark}{(c.IsDefault ? " [default]" : "")}");
                 sb.AppendLine($"  Last Poll: {poll}");
                 sb.AppendLine($"  Claim: {d.LastClaimCount} · {d.ClaimReason ?? "-"}");
+                sb.AppendLine($"  Received total: {d.JobsReceivedTotal} · Printed total: {d.JobsPrintedTotal}");
                 sb.AppendLine($"  Print: {(d.LastPrintOk == true ? "OK" : d.LastPrintOk == false ? "Failed" : "-")} · {d.PrintReason ?? "-"}");
+                sb.AppendLine($"  Last error: {d.LastError ?? c.LastError ?? "-"}");
                 sb.AppendLine($"  Pipeline: {d.PipelineSummary}");
                 if (!string.IsNullOrWhiteSpace(c.BridgeId))
                     sb.AppendLine($"  bridgeId: {c.BridgeId}");

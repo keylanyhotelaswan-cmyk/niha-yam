@@ -3,24 +3,36 @@ using ZXing.Windows.Compatibility;
 
 namespace Niha.PrintBridge;
 
+/// <summary>
+/// Pair / Re-Pair step: paste Pairing Token, QR, or short code (short code OK when re-pairing a known env).
+/// </summary>
 public sealed class PairForm : Form
 {
     private readonly BridgeConfig _cfg;
+    private readonly BridgeLogger? _log;
+    private readonly BridgeConnection? _forceTarget;
     private readonly TextBox _code;
     private readonly Label _status;
+    private readonly TextBox _errorBox;
     private readonly Button _pairBtn;
+    private readonly Button _copyErrBtn;
     private bool _busy;
     private PairingHelper.ParsedPair? _pending;
+    private string _lastErrorDetail = "";
 
     public bool PairedOk { get; private set; }
 
-    public PairForm(BridgeConfig cfg)
+    /// <param name="forceTarget">When set, Re-Pair this connection only (other envs untouched).</param>
+    public PairForm(BridgeConfig cfg, BridgeLogger? log = null, BridgeConnection? forceTarget = null)
     {
         _cfg = cfg;
+        _log = log;
+        _forceTarget = forceTarget;
+
         NihaTheme.ApplyForm(this);
-        Text = Ar.Pair;
-        Width = 460;
-        Height = 460;
+        Text = forceTarget is null ? Ar.Pair : Ar.RePairConnection;
+        Width = 520;
+        Height = 560;
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = false;
         MinimizeBox = false;
@@ -32,13 +44,17 @@ public sealed class PairForm : Form
         var body = new Panel
         {
             Dock = DockStyle.Fill,
-            Padding = new Padding(24),
+            Padding = new Padding(20),
             BackColor = NihaTheme.Background,
+            AutoScroll = true,
         };
 
+        var hintText = forceTarget is null
+            ? Ar.PairHint
+            : string.Format(Ar.RePairHintFmt, EnvName(forceTarget));
         var hint = new Label
         {
-            Text = Ar.PairHint,
+            Text = hintText,
             AutoSize = false,
             Height = 56,
             Dock = DockStyle.Top,
@@ -52,20 +68,19 @@ public sealed class PairForm : Form
             Dock = DockStyle.Top,
             Height = 24,
             Font = NihaTheme.UiFont(10f, FontStyle.Bold),
-            Padding = new Padding(0, 12, 0, 0),
+            Padding = new Padding(0, 8, 0, 0),
         };
 
         _code = new TextBox
         {
             Dock = DockStyle.Top,
-            Height = 72,
-            Font = NihaTheme.UiFont(12f, FontStyle.Bold),
+            Height = 80,
+            Font = NihaTheme.UiFont(11f, FontStyle.Bold),
             TextAlign = HorizontalAlignment.Center,
             PlaceholderText = Ar.EnterCode,
             Multiline = true,
             AcceptsReturn = false,
             ScrollBars = ScrollBars.Vertical,
-            // Full Pairing Token / JSON — never truncate.
             MaxLength = 0,
         };
         _code.KeyDown += (_, e) =>
@@ -83,7 +98,7 @@ public sealed class PairForm : Form
             Height = 48,
             FlowDirection = FlowDirection.RightToLeft,
             WrapContents = false,
-            Padding = new Padding(0, 12, 0, 0),
+            Padding = new Padding(0, 10, 0, 0),
         };
 
         _pairBtn = NihaTheme.PrimaryButton(Ar.Pair);
@@ -98,7 +113,6 @@ public sealed class PairForm : Form
         scanBtn.Width = 100;
         scanBtn.Click += (_, _) => ScanQrFromClipboard();
 
-        // RTL Flow: first added appears on the right — Pair, Paste, Scan
         actions.Controls.Add(_pairBtn);
         actions.Controls.Add(pasteBtn);
         actions.Controls.Add(scanBtn);
@@ -115,19 +129,49 @@ public sealed class PairForm : Form
         _status = new Label
         {
             Dock = DockStyle.Top,
-            Height = 36,
+            Height = 28,
             ForeColor = NihaTheme.Muted,
             TextAlign = ContentAlignment.MiddleCenter,
         };
 
-        if (!PairingHelper.HasCloudDefaults(_cfg))
+        _errorBox = new TextBox
+        {
+            Dock = DockStyle.Top,
+            Height = 90,
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Vertical,
+            Font = NihaTheme.UiFont(9f),
+            ForeColor = NihaTheme.Danger,
+            BorderStyle = BorderStyle.FixedSingle,
+            Visible = false,
+            RightToLeft = RightToLeft.Yes,
+        };
+
+        _copyErrBtn = NihaTheme.OutlineButton(Ar.CopyErrorDetails);
+        _copyErrBtn.Dock = DockStyle.Top;
+        _copyErrBtn.Height = 32;
+        _copyErrBtn.Visible = false;
+        _copyErrBtn.Click += (_, _) =>
+        {
+            if (string.IsNullOrWhiteSpace(_lastErrorDetail)) return;
+            try
+            {
+                Clipboard.SetText(_lastErrorDetail);
+                _status.Text = Ar.ErrorDetailsCopied;
+                _status.ForeColor = NihaTheme.Success;
+            }
+            catch { /* ignore */ }
+        };
+
+        if (!PairingHelper.HasCloudDefaults(_cfg, forceTarget: forceTarget))
         {
             _status.Text = Ar.MissingCloudConfigHint;
             _status.ForeColor = NihaTheme.Warning;
-            // Keep Pair enabled — full Pairing Token supplies url/anon.
         }
 
-        // Add in reverse for Dock Top
+        body.Controls.Add(_copyErrBtn);
+        body.Controls.Add(_errorBox);
         body.Controls.Add(_status);
         body.Controls.Add(scanHint);
         body.Controls.Add(actions);
@@ -139,7 +183,7 @@ public sealed class PairForm : Form
         {
             Dock = DockStyle.Bottom,
             Height = 56,
-            Padding = new Padding(24, 8, 24, 12),
+            Padding = new Padding(20, 8, 20, 12),
             BackColor = NihaTheme.Background,
         };
         var cancel = NihaTheme.OutlineButton(Ar.Cancel);
@@ -158,6 +202,13 @@ public sealed class PairForm : Form
         AcceptButton = _pairBtn;
     }
 
+    private static string EnvName(BridgeConnection c) => c.Env switch
+    {
+        "production" => Ar.EnvProduction,
+        "testing" => Ar.EnvTesting,
+        _ => Ar.EnvUnknown,
+    };
+
     private static Panel BuildHeader()
     {
         var p = new Panel { BackColor = NihaTheme.Primary, Padding = new Padding(16) };
@@ -166,9 +217,8 @@ public sealed class PairForm : Form
             Image = NihaTheme.CreateLogo(40),
             SizeMode = PictureBoxSizeMode.Zoom,
             Size = new Size(40, 40),
-            Location = new Point(16, 16),
+            Dock = DockStyle.Right,
         };
-        logo.Dock = DockStyle.Right;
         var title = new Label
         {
             Text = Ar.AppTitle,
@@ -183,16 +233,49 @@ public sealed class PairForm : Form
         return p;
     }
 
+    private void ClearError()
+    {
+        _errorBox.Visible = false;
+        _errorBox.Text = "";
+        _copyErrBtn.Visible = false;
+        _lastErrorDetail = "";
+    }
+
+    private void ShowError(string userMessage, string? technicalDetail = null)
+    {
+        _status.Text = Ar.PairFailed;
+        _status.ForeColor = NihaTheme.Danger;
+        _errorBox.Text = userMessage;
+        _errorBox.Visible = true;
+        _copyErrBtn.Visible = true;
+        _lastErrorDetail =
+            $"NIHA Print Bridge {typeof(PairForm).Assembly.GetName().Version?.ToString(3)}\n" +
+            $"Time: {DateTimeOffset.Now:O}\n" +
+            $"UserMessage: {userMessage}\n" +
+            $"Detail: {technicalDetail ?? userMessage}\n" +
+            $"TargetEnv: {(_forceTarget is null ? "(new)" : _forceTarget.Env)}\n" +
+            $"TargetUrl: {(_forceTarget?.SupabaseUrl ?? "(none)")}\n";
+        _log?.Error($"pair FAIL: {technicalDetail ?? userMessage}");
+    }
+
     private void ApplyPending(PairingHelper.ParsedPair parsed)
     {
+        ClearError();
         _pending = parsed;
-        // Show short code only — never raw JSON/token in the box after successful parse.
-        _code.Text = parsed.Code;
-        var env = PairingHelper.EnvLabel(parsed);
-        _status.Text = string.IsNullOrWhiteSpace(parsed.Url)
-            ? ""
-            : string.Format(Ar.PairReadyEnvFmt, env);
-        _status.ForeColor = NihaTheme.Success;
+        // Keep full token in box if it was a payload — easier re-try; show code for short.
+        if (!string.IsNullOrWhiteSpace(parsed.Url))
+        {
+            // Show friendly code + confirm env; pending retains url/anon.
+            _code.Text = parsed.Code;
+            _status.Text = string.Format(Ar.PairReadyEnvFmt, PairingHelper.EnvLabel(parsed));
+            _status.ForeColor = NihaTheme.Success;
+        }
+        else
+        {
+            _code.Text = parsed.Code;
+            _status.Text = _forceTarget is null ? "" : string.Format(Ar.PairReadyEnvFmt, EnvName(_forceTarget));
+            _status.ForeColor = NihaTheme.Muted;
+        }
     }
 
     private void PasteCode()
@@ -203,16 +286,14 @@ public sealed class PairForm : Form
             var text = Clipboard.GetText();
             if (!PairingHelper.TryParseInput(text, out var parsed))
             {
-                _status.Text = Ar.InvalidCode;
-                _status.ForeColor = NihaTheme.Danger;
+                ShowError(Ar.InvalidCode, "TryParseInput failed for clipboard text");
                 return;
             }
             ApplyPending(parsed);
         }
-        catch
+        catch (Exception ex)
         {
-            _status.Text = Ar.InvalidCode;
-            _status.ForeColor = NihaTheme.Danger;
+            ShowError(Ar.InvalidCode, ex.ToString());
         }
     }
 
@@ -234,17 +315,10 @@ public sealed class PairForm : Form
                 Options = { TryHarder = true, PossibleFormats = [BarcodeFormat.QR_CODE] },
             };
             var result = reader.Decode(img);
-            if (result is null || string.IsNullOrWhiteSpace(result.Text))
+            if (result is null || string.IsNullOrWhiteSpace(result.Text) ||
+                !PairingHelper.TryParseInput(result.Text, out var parsed))
             {
-                _status.Text = Ar.InvalidCode;
-                _status.ForeColor = NihaTheme.Danger;
-                return;
-            }
-
-            if (!PairingHelper.TryParseInput(result.Text, out var parsed))
-            {
-                _status.Text = Ar.InvalidCode;
-                _status.ForeColor = NihaTheme.Danger;
+                ShowError(Ar.InvalidCode, "QR decode/parse failed");
                 return;
             }
 
@@ -252,19 +326,16 @@ public sealed class PairForm : Form
         }
         catch (Exception ex)
         {
-            _status.Text = ex.Message;
-            _status.ForeColor = NihaTheme.Danger;
+            ShowError(Ar.InvalidCode, ex.ToString());
         }
     }
 
     private PairingHelper.ParsedPair? ResolveParsed()
     {
-        // Full payload still in the box (JSON / Pairing Token).
         if (PairingHelper.TryParseInput(_code.Text, out var fromBox) &&
             !string.IsNullOrWhiteSpace(fromBox.Url))
             return fromBox;
 
-        // After Paste/Scan we show only the short code — keep pending url/anon.
         if (_pending is { } pending && !string.IsNullOrWhiteSpace(pending.Url))
         {
             if (string.IsNullOrWhiteSpace(_code.Text) ||
@@ -281,38 +352,35 @@ public sealed class PairForm : Form
     private async Task DoPairAsync()
     {
         if (_busy) return;
+        ClearError();
 
         var parsed = ResolveParsed();
         if (parsed is null)
         {
-            _status.Text = Ar.InvalidCode;
-            _status.ForeColor = NihaTheme.Danger;
+            ShowError(Ar.InvalidCode, "ResolveParsed returned null");
             return;
         }
 
-        if (PairingHelper.RequiresPayloadForSecondEnv(_cfg, parsed))
+        if (PairingHelper.RequiresPayloadForSecondEnv(_cfg, parsed, _forceTarget))
         {
-            _status.Text = Ar.NeedQrForSecondEnv;
-            _status.ForeColor = NihaTheme.Danger;
+            ShowError(Ar.NeedQrForSecondEnv, "RequiresPayloadForSecondEnv");
             return;
         }
 
         BridgeConnection conn;
         try
         {
-            conn = PairingHelper.UpsertConnection(_cfg, parsed);
+            conn = PairingHelper.UpsertConnection(_cfg, parsed, _forceTarget);
         }
         catch (Exception ex)
         {
-            _status.Text = FriendlyError(ex.Message);
-            _status.ForeColor = NihaTheme.Danger;
+            ShowError(FriendlyUserMessage(ex.Message), ex.ToString());
             return;
         }
 
-        if (!PairingHelper.HasCloudDefaults(_cfg, parsed))
+        if (!PairingHelper.HasCloudDefaults(_cfg, parsed, conn))
         {
-            _status.Text = Ar.MissingCloudConfig;
-            _status.ForeColor = NihaTheme.Danger;
+            ShowError(Ar.MissingCloudConfig, "HasCloudDefaults false after upsert");
             return;
         }
 
@@ -320,11 +388,12 @@ public sealed class PairForm : Form
         _pairBtn.Enabled = false;
         _status.ForeColor = NihaTheme.Muted;
         _status.Text = Ar.Pairing;
+        _log?.Info($"pair start env={conn.Env} urlHost={SafeHost(conn.SupabaseUrl)} codeLen={parsed.Code.Length}");
 
         try
         {
             var api = new SupabaseBridgeApi(conn);
-            var version = typeof(PairForm).Assembly.GetName().Version?.ToString(3) ?? "0.5.3";
+            var version = typeof(PairForm).Assembly.GetName().Version?.ToString(3) ?? "0.5.6";
             var result = await api.PairAsync(
                 parsed.Code,
                 Environment.MachineName,
@@ -341,16 +410,17 @@ public sealed class PairForm : Form
                 !string.IsNullOrWhiteSpace(rn.GetString()))
                 conn.RestaurantName = rn.GetString();
             conn.Env = BridgeConnection.DetectEnv(conn.SupabaseUrl);
+            conn.LastError = null;
 
             ConfigStore.Save(_cfg);
+            _log?.Info($"pair OK env={conn.Env} bridgeId={conn.BridgeId}");
             PairedOk = true;
             DialogResult = DialogResult.OK;
             Close();
         }
         catch (Exception ex)
         {
-            _status.Text = $"{Ar.PairFailed}: {FriendlyError(ex.Message)}";
-            _status.ForeColor = NihaTheme.Danger;
+            ShowError(FriendlyUserMessage(ex.Message), ex.ToString());
         }
         finally
         {
@@ -359,10 +429,38 @@ public sealed class PairForm : Form
         }
     }
 
-    private static string FriendlyError(string raw)
+    private static string SafeHost(string? url)
     {
-        if (raw.Contains("INVALID_CODE", StringComparison.OrdinalIgnoreCase))
+        try { return string.IsNullOrWhiteSpace(url) ? "" : new Uri(url).Host; }
+        catch { return "(bad-url)"; }
+    }
+
+    private static string FriendlyUserMessage(string raw)
+    {
+        if (raw.Contains("INVALID_CODE", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("invalid_code", StringComparison.OrdinalIgnoreCase))
             return Ar.InvalidCode;
-        return raw.Length > 120 ? raw[..120] + "…" : raw;
+        if (raw.Contains("EXPIRED", StringComparison.OrdinalIgnoreCase))
+            return Ar.PairCodeExpired;
+        if (raw.Contains("NeedQr", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("بيئة إضافية", StringComparison.Ordinal))
+            return Ar.NeedQrForSecondEnv;
+        if (raw.Contains("MissingCloud", StringComparison.OrdinalIgnoreCase) ||
+            raw.Contains("ملف الإعدادات", StringComparison.Ordinal))
+            return Ar.MissingCloudConfig;
+        if (raw.Contains("pair_print_bridge failed", StringComparison.OrdinalIgnoreCase))
+        {
+            // Pull useful server message without dumping huge HTML.
+            var idx = raw.IndexOf('{');
+            if (idx >= 0)
+            {
+                var json = raw[idx..];
+                if (json.Length > 280) json = json[..280] + "…";
+                return $"{Ar.PairFailed}: {json}";
+            }
+        }
+        // Cap UI length but keep copy-buffer full via ShowError technicalDetail.
+        var msg = raw.ReplaceLineEndings(" ").Trim();
+        return msg.Length > 400 ? msg[..400] + "…" : msg;
     }
 }

@@ -594,7 +594,7 @@ public sealed class MainForm : Form
 
     public void ShowConnections()
     {
-        using var form = new ConnectionsForm(_cfg, _worker, () => RePairRequested?.Invoke());
+        using var form = new ConnectionsForm(_cfg, _worker, _log);
         form.ConnectionsChanged += () =>
         {
             RefreshStatus(_lastLinkState);

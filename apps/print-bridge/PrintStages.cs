@@ -42,10 +42,13 @@ public sealed class ConnectionPollDiag
     public DateTimeOffset? LastPollAt { get; set; }
     public bool LinkOk { get; set; }
     public int LastClaimCount { get; set; }
+    public long JobsReceivedTotal { get; set; }
+    public long JobsPrintedTotal { get; set; }
     public string? ClaimReason { get; set; }
     public string? LastJobRef { get; set; }
     public bool? LastPrintOk { get; set; }
     public string? PrintReason { get; set; }
+    public string? LastError { get; set; }
     public PrintStage LastStage { get; set; } = PrintStage.Idle;
     public string LastStageDetail { get; set; } = "";
 
@@ -54,7 +57,7 @@ public sealed class ConnectionPollDiag
     {
         get
         {
-            if (!LinkOk) return "Link ✗";
+            if (!LinkOk) return $"Link ✗ · {LastError ?? "offline"}";
             if (LastClaimCount <= 0)
                 return $"Link ✓ → Claim 0 · {ClaimReason ?? "empty/gated"}";
             if (LastPrintOk == true)

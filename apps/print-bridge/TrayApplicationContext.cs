@@ -237,15 +237,20 @@ public sealed class TrayApplicationContext : ApplicationContext
 
     private void DoPair(bool force)
     {
-        // force = open pair dialog to add/update an env (QR targets Testing or Production).
-        // Never wipe other connections — dual-env relies on keeping both tokens.
+        // First-run: open pair step. Later: connection hub (add / re-pair / reset).
         if (!force && _cfg.PairedConnections().Any())
             return;
 
-        using var form = new PairForm(_cfg);
+        if (force && _cfg.Connections.Count > 0)
+        {
+            ShowMain();
+            _main?.ShowConnections();
+            return;
+        }
+
+        using var form = new PairForm(_cfg, _log);
         if (form.ShowDialog() == DialogResult.OK && form.PairedOk)
         {
-            // New PC: ensure it always comes back after reboot
             _cfg.StartWithWindows = true;
             _cfg.StartWithWindowsInitialized = true;
             Autostart.SetEnabled(true);

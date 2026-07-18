@@ -61,9 +61,19 @@ public static class Ar
 
     public const string ManageConnections = "إدارة الاتصالات";
     public const string ManageConnectionsHint =
-        "الاتصال الناجح لا يعني أن الطباعة تعمل — راجع Claim والسبب أسفل كل بيئة.";
-    public const string NoConnections = "لا توجد اتصالات محفوظة. اربط بيئة من زر «ربط بيئة».";
-    public const string Reconnect = "إعادة الاتصال";
+        "الاتصال ≠ الطباعة. لكل بيئة: Poll · Claim · مطبوع · آخر خطأ · مسار الدورة.\n" +
+        "«إعادة الاقتران» يعيد ربط بيئة واحدة دون حذف الأخرى.";
+    public const string NoConnections =
+        "لا توجد اتصالات محفوظة. اضغط «إضافة بيئة» أو الصق رمز الربط الكامل.";
+    public const string AddEnvironment = "إضافة بيئة جديدة";
+    public const string RePairConnection = "إعادة الاقتران";
+    public const string RePairHintFmt =
+        "إعادة اقتران «{0}» فقط — بقية البيئات لن تُمس.\n" +
+        "الصق رمز الربط الكامل أو الرمز القصير من مركز الطباعة لهذه البيئة.";
+    public const string RePairConfirmFmt =
+        "إعادة اقتران «{0}»؟\n\n" +
+        "سيُحذف رمز الربط لهذه البيئة فقط، ثم يُفتح معالج الاقتران.\n" +
+        "الطابعات وإعدادات البرنامج واتصالات البيئات الأخرى تبقى.";
     public const string DeleteConnection = "حذف الاتصال";
     public const string SetDefault = "تعيين كافتراضي";
     public const string DefaultBadge = "افتراضي";
@@ -71,14 +81,24 @@ public static class Ar
         "حذف اتصال «{0}» من هذا الجهاز؟ ستحتاج إلى الربط مرة أخرى لهذه البيئة.";
     public const string ResetConnections = "إعادة ضبط الاتصالات";
     public const string ResetConnectionsConfirm =
-        "سيتم حذف جميع الاتصالات المحفوظة، وستحتاج إلى ربط البيئات مرة أخرى.\n\n" +
-        "لن تُحذف إعدادات الجهاز أو الطابعات أو مسار التثبيت.\n\nمتابعة؟";
+        "سيتم حذف جميع الاتصالات المحفوظة فقط.\n\n" +
+        "لن يتم حذف:\n" +
+        "• الطابعات\n" +
+        "• إعدادات البرنامج\n" +
+        "• ملفات البرنامج\n\n" +
+        "وستحتاج إلى ربط البيئات مرة أخرى.\n\nمتابعة؟";
     public const string ResetConnectionsDone = "تم حذف الاتصالات. اربط البيئات من جديد.";
-    public const string ConnLastPoll = "آخر استطلاع";
-    public const string ConnClaimFmt = "Claim: {0} مهمة";
+    public const string ConnLastPoll = "آخر Poll";
+    public const string ConnClaimFmt = "Claim: {0}";
     public const string ConnClaimZero = "Claim: 0";
+    public const string ConnReceivedTotal = "مستلمة";
+    public const string ConnPrintedTotal = "مطبوعة";
     public const string ConnPrint = "Print";
+    public const string ConnLastError = "آخر خطأ";
     public const string ConnPipeline = "المسار";
+    public const string CopyErrorDetails = "نسخ تفاصيل الخطأ";
+    public const string ErrorDetailsCopied = "تم نسخ تفاصيل الخطأ";
+    public const string PairCodeExpired = "انتهت صلاحية رمز الاقتران — أنشئ رمزاً جديداً من مركز الطباعة";
     public const string Printers = "الطابعات";
     public const string NoPrinters = "لا توجد طابعات مثبتة على هذا الجهاز";
     public const string TestPrint = "اختبار محلي (تشخيص)";

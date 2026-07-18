@@ -1,30 +1,33 @@
 namespace Niha.PrintBridge;
 
-/// <summary>Manage saved Production/Testing connections without deleting app settings.</summary>
+/// <summary>
+/// Connection hub: list envs, diagnostics, Re-Pair one env, add env, reset all.
+/// Does not delete printers or app settings.
+/// </summary>
 public sealed class ConnectionsForm : Form
 {
     private readonly BridgeConfig _cfg;
     private readonly PrintWorker _worker;
-    private readonly Action _requestRePair;
+    private readonly BridgeLogger _log;
     private readonly FlowLayoutPanel _list;
     private readonly Label _hint;
 
     public event Action? ConnectionsChanged;
 
-    public ConnectionsForm(BridgeConfig cfg, PrintWorker worker, Action requestRePair)
+    public ConnectionsForm(BridgeConfig cfg, PrintWorker worker, BridgeLogger log)
     {
         _cfg = cfg;
         _worker = worker;
-        _requestRePair = requestRePair;
+        _log = log;
 
         NihaTheme.ApplyForm(this);
         Text = Ar.ManageConnections;
-        Width = 560;
-        Height = 560;
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = false;
+        Width = 580;
+        Height = 620;
+        FormBorderStyle = FormBorderStyle.Sizable;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterParent;
+        MinimumSize = new Size(520, 480);
 
         var header = new Panel
         {
@@ -46,14 +49,20 @@ public sealed class ConnectionsForm : Form
         var footer = new Panel
         {
             Dock = DockStyle.Bottom,
-            Height = 100,
+            Height = 140,
             Padding = new Padding(16, 8, 16, 12),
             BackColor = NihaTheme.Background,
         };
 
+        var addBtn = NihaTheme.PrimaryButton(Ar.AddEnvironment);
+        addBtn.Dock = DockStyle.Top;
+        addBtn.Height = 40;
+        addBtn.Click += (_, _) => RunPair(forceTarget: null);
+
         var resetBtn = NihaTheme.OutlineButton(Ar.ResetConnections);
         resetBtn.Dock = DockStyle.Top;
         resetBtn.Height = 40;
+        resetBtn.Margin = new Padding(0, 8, 0, 0);
         resetBtn.ForeColor = NihaTheme.Danger;
         resetBtn.Click += (_, _) => ResetAll();
 
@@ -62,13 +71,14 @@ public sealed class ConnectionsForm : Form
         closeBtn.Height = 36;
         closeBtn.Click += (_, _) => Close();
 
+        footer.Controls.Add(addBtn);
         footer.Controls.Add(resetBtn);
         footer.Controls.Add(closeBtn);
 
         _hint = new Label
         {
             Dock = DockStyle.Top,
-            Height = 44,
+            Height = 52,
             Padding = new Padding(16, 8, 16, 0),
             Text = Ar.ManageConnectionsHint,
             ForeColor = NihaTheme.Muted,
@@ -100,8 +110,7 @@ public sealed class ConnectionsForm : Form
         ConfigStore.Normalize(_cfg);
 
         var conns = _cfg.Connections
-            .OrderBy(c => c.IsDefault ? 0 : 1)
-            .ThenBy(c =>
+            .OrderBy(c =>
                 string.Equals(c.Env, "production", StringComparison.OrdinalIgnoreCase) ? 0 :
                 string.Equals(c.Env, "testing", StringComparison.OrdinalIgnoreCase) ? 1 : 2)
             .ToList();
@@ -112,6 +121,7 @@ public sealed class ConnectionsForm : Form
             {
                 Text = Ar.NoConnections,
                 AutoSize = true,
+                MaximumSize = new Size(500, 0),
                 ForeColor = NihaTheme.Muted,
                 Font = NihaTheme.UiFont(10f),
                 Margin = new Padding(8),
@@ -129,7 +139,8 @@ public sealed class ConnectionsForm : Form
     private Panel BuildCard(BridgeConnection c)
     {
         var diag = _worker.GetConnDiag(c);
-        var online = c.IsPaired && diag.LinkOk &&
+        var paired = c.IsPaired;
+        var online = paired && diag.LinkOk &&
             c.LastHeartbeatAt is { } hb &&
             (DateTimeOffset.Now - hb).TotalSeconds < 90 &&
             string.IsNullOrWhiteSpace(c.LastError);
@@ -140,44 +151,41 @@ public sealed class ConnectionsForm : Form
             "testing" => Ar.EnvTesting,
             _ => Ar.EnvUnknown,
         };
-        var mark = online ? "[ON]" : "[OFF]";
+        var mark = !paired ? "[—]" : online ? "[ON]" : "[OFF]";
         var rest = string.IsNullOrWhiteSpace(c.RestaurantName) ? Ar.None : c.RestaurantName!;
         var poll = diag.LastPollAt is { } p ? p.ToLocalTime().ToString("HH:mm:ss") : Ar.None;
-        var claimLine = diag.LastClaimCount > 0
-            ? string.Format(Ar.ConnClaimFmt, diag.LastClaimCount)
-            : $"{Ar.ConnClaimZero}: {diag.ClaimReason ?? Ar.None}";
-        var printLine = diag.LastPrintOk switch
-        {
-            true => $"{Ar.PrintOk}: {diag.PrintReason ?? ""}",
-            false => $"{Ar.PrintFail}: {diag.PrintReason ?? ""}",
-            null => Ar.None,
-        };
+        var status = !paired ? Ar.NotPaired : online ? Ar.ConnOnline : Ar.ConnOffline;
 
         var card = NihaTheme.Card();
-        card.Width = _list.ClientSize.Width > 40 ? _list.ClientSize.Width - 36 : 500;
-        card.Height = 200;
+        card.Width = Math.Max(480, _list.ClientSize.Width - 36);
+        card.Height = 250;
         card.Margin = new Padding(0, 0, 0, 10);
         card.Padding = new Padding(12);
 
         var title = new Label
         {
-            Text = $"{mark} {env}" + (c.IsDefault ? $" · {Ar.DefaultBadge}" : ""),
+            Text = $"{mark} {env}" + (c.IsDefault ? $" · {Ar.DefaultBadge}" : "") +
+                   (paired ? " ✓" : " ✕"),
             Dock = DockStyle.Top,
-            Height = 24,
+            Height = 26,
             Font = NihaTheme.UiFont(11f, FontStyle.Bold),
-            ForeColor = online ? NihaTheme.Success : NihaTheme.Muted,
+            ForeColor = online ? NihaTheme.Success : (paired ? NihaTheme.Warning : NihaTheme.Muted),
         };
+
         var body = new Label
         {
             Text =
                 $"{Ar.RestaurantName}: {rest}\n" +
-                $"{Ar.Status}: {(online ? Ar.ConnOnline : Ar.ConnOffline)}\n" +
+                $"{Ar.Status}: {status}\n" +
                 $"{Ar.ConnLastPoll}: {poll}\n" +
-                $"{claimLine}\n" +
-                $"{Ar.ConnPrint}: {printLine}\n" +
+                $"{string.Format(Ar.ConnClaimFmt, diag.LastClaimCount)} · " +
+                $"{Ar.ConnReceivedTotal}: {diag.JobsReceivedTotal} · {Ar.ConnPrintedTotal}: {diag.JobsPrintedTotal}\n" +
+                $"{Ar.ConnPrint}: {(diag.LastPrintOk == true ? Ar.PrintOk : diag.LastPrintOk == false ? Ar.PrintFail : Ar.None)}" +
+                $"{(string.IsNullOrWhiteSpace(diag.PrintReason) ? "" : " — " + diag.PrintReason)}\n" +
+                $"{Ar.ConnLastError}: {diag.LastError ?? c.LastError ?? Ar.None}\n" +
                 $"{Ar.ConnPipeline}: {diag.PipelineSummary}",
             Dock = DockStyle.Top,
-            Height = 110,
+            Height = 130,
             Font = NihaTheme.UiFont(9f),
             ForeColor = NihaTheme.Foreground,
         };
@@ -185,19 +193,15 @@ public sealed class ConnectionsForm : Form
         var actions = new FlowLayoutPanel
         {
             Dock = DockStyle.Bottom,
-            Height = 40,
+            Height = 72,
             FlowDirection = FlowDirection.RightToLeft,
-            WrapContents = false,
+            WrapContents = true,
         };
 
-        var reconnect = NihaTheme.PrimaryButton(Ar.Reconnect);
-        reconnect.Width = 110;
-        reconnect.Height = 32;
-        reconnect.Click += (_, _) =>
-        {
-            Close();
-            _requestRePair();
-        };
+        var rePair = NihaTheme.PrimaryButton(Ar.RePairConnection);
+        rePair.Width = 120;
+        rePair.Height = 32;
+        rePair.Click += (_, _) => RePairOne(c);
 
         var del = NihaTheme.OutlineButton(Ar.DeleteConnection);
         del.Width = 100;
@@ -207,7 +211,7 @@ public sealed class ConnectionsForm : Form
         var setDef = NihaTheme.OutlineButton(Ar.SetDefault);
         setDef.Width = 120;
         setDef.Height = 32;
-        setDef.Enabled = !c.IsDefault && c.IsPaired;
+        setDef.Enabled = paired && !c.IsDefault;
         setDef.Click += (_, _) =>
         {
             ConfigStore.SetDefaultConnection(_cfg, c.Id);
@@ -215,7 +219,7 @@ public sealed class ConnectionsForm : Form
             Rebuild();
         };
 
-        actions.Controls.Add(reconnect);
+        actions.Controls.Add(rePair);
         actions.Controls.Add(del);
         actions.Controls.Add(setDef);
 
@@ -223,6 +227,39 @@ public sealed class ConnectionsForm : Form
         card.Controls.Add(body);
         card.Controls.Add(title);
         return card;
+    }
+
+    private void RePairOne(BridgeConnection c)
+    {
+        var env = c.Env switch
+        {
+            "production" => Ar.EnvProduction,
+            "testing" => Ar.EnvTesting,
+            _ => Ar.EnvUnknown,
+        };
+        var r = MessageBox.Show(
+            string.Format(Ar.RePairConfirmFmt, env),
+            Ar.RePairConnection,
+            MessageBoxButtons.YesNo,
+            MessageBoxIcon.Question);
+        if (r != DialogResult.Yes) return;
+
+        ConfigStore.ClearPairingOnly(_cfg, c.Id);
+        _log.Info($"re-pair cleared credentials env={c.Env} id={c.Id}");
+        ConnectionsChanged?.Invoke();
+        RunPair(forceTarget: c);
+        Rebuild();
+    }
+
+    private void RunPair(BridgeConnection? forceTarget)
+    {
+        using var form = new PairForm(_cfg, _log, forceTarget);
+        if (form.ShowDialog(this) == DialogResult.OK && form.PairedOk)
+        {
+            ConnectionsChanged?.Invoke();
+            MessageBox.Show(Ar.PairSuccess, Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+        Rebuild();
     }
 
     private void DeleteOne(BridgeConnection c)
@@ -241,6 +278,7 @@ public sealed class ConnectionsForm : Form
         if (r != DialogResult.Yes) return;
 
         ConfigStore.RemoveConnection(_cfg, c.Id);
+        _log.Info($"connection deleted env={c.Env} id={c.Id}");
         ConnectionsChanged?.Invoke();
         Rebuild();
     }
@@ -256,6 +294,7 @@ public sealed class ConnectionsForm : Form
         if (r != DialogResult.Yes) return;
 
         ConfigStore.ClearConnectionsOnly(_cfg);
+        _log.Info("all connections reset");
         ConnectionsChanged?.Invoke();
         MessageBox.Show(Ar.ResetConnectionsDone, Ar.AppTitle, MessageBoxButtons.OK, MessageBoxIcon.Information);
         Rebuild();

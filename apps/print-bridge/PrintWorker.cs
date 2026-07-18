@@ -164,6 +164,20 @@ public static class ConfigStore
         Save(cfg);
     }
 
+    /// <summary>
+    /// Clear pairing credentials for one connection only — keeps URL/anon so Re-Pair
+    /// can use a short code for that env without touching other connections.
+    /// </summary>
+    public static void ClearPairingOnly(BridgeConfig cfg, string connectionId)
+    {
+        Normalize(cfg);
+        var conn = cfg.FindById(connectionId);
+        if (conn is null) return;
+        PairingHelper.ClearPairingCredentials(conn);
+        SyncLegacyFields(cfg);
+        Save(cfg);
+    }
+
     private static void ApplyDefaults(BridgeConfig cfg)
     {
         try
@@ -379,8 +393,10 @@ public sealed class PrintWorker
                         else
                         {
                             anyJobsThisPoll = true;
+                            diag.JobsReceivedTotal += jobs.Count;
                             diag.ClaimReason = $"claimed {jobs.Count}";
                             diag.LastJobRef = jobs[0].Reference ?? jobs[0].Id.ToString();
+                            diag.LastError = null;
                             diag.LastStage = PrintStage.ClaimReceived;
                             SetStage(
                                 PrintStage.ClaimReceived,
@@ -405,6 +421,7 @@ public sealed class PrintWorker
                     {
                         conn.LastError = ex.Message;
                         diag.LinkOk = false;
+                        diag.LastError = ex.Message;
                         diag.ClaimReason = ex.Message;
                         diag.LastStage = PrintStage.Failed;
                         diag.LastStageDetail = ex.Message;
@@ -502,6 +519,7 @@ public sealed class PrintWorker
             SetStage(PrintStage.TtlExpired, $"ref={refId} expiredAt={exp:O}", envTag);
             diag.LastPrintOk = false;
             diag.PrintReason = "TTL expired — job ignored";
+            diag.LastError = diag.PrintReason;
             diag.LastStage = PrintStage.TtlExpired;
             try
             {
@@ -531,6 +549,7 @@ public sealed class PrintWorker
             SetStage(PrintStage.Failed, $"render failed ref={refId}: {ex.Message}", envTag);
             diag.LastPrintOk = false;
             diag.PrintReason = $"Render failed: {ex.Message}";
+            diag.LastError = diag.PrintReason;
             diag.LastStage = PrintStage.Failed;
             await ReportFailAsync(api, connectionKey, job, "RENDER_FAILED", ex.Message, ct, envTag);
             PrintFinished?.Invoke(false, $"{refId} · stopped_at=render · {ex.Message}");
@@ -560,6 +579,7 @@ public sealed class PrintWorker
             SetStage(PrintStage.Failed, $"printer resolve failed ref={refId}: {ex.Message}", envTag);
             diag.LastPrintOk = false;
             diag.PrintReason = $"Printer not matched: {ex.Message}";
+            diag.LastError = diag.PrintReason;
             diag.LastStage = PrintStage.Failed;
             await ReportFailAsync(api, connectionKey, job, "PRINTER_RESOLVE_FAILED", ex.Message, ct, envTag);
             PrintFinished?.Invoke(false, $"{refId} · stopped_at=printer_resolve · {ex.Message}");
@@ -580,6 +600,7 @@ public sealed class PrintWorker
             SetStage(PrintStage.Failed, $"ref={refId} stopped_at={spool.Stage} · {spool.Detail}", envTag);
             diag.LastPrintOk = false;
             diag.PrintReason = $"{spool.Stage}: {spool.Detail}";
+            diag.LastError = diag.PrintReason;
             diag.LastStage = PrintStage.Failed;
             await ReportFailAsync(
                 api,
@@ -605,7 +626,9 @@ public sealed class PrintWorker
             SetStage(PrintStage.ReportSuccess, $"ref={refId} → {printerName} delivery={delivery}", envTag);
             SetStage(PrintStage.Done, $"ref={refId} pipeline complete", envTag);
             diag.LastPrintOk = true;
+            diag.JobsPrintedTotal++;
             diag.PrintReason = $"OK → {printerName}";
+            diag.LastError = null;
             diag.LastStage = PrintStage.Done;
             PrintFinished?.Invoke(true, $"{refId} → {printerName}");
         }
@@ -617,7 +640,9 @@ public sealed class PrintWorker
                 $"ref={refId} spooler OK but report failed (queued offline): {ex.Message}",
                 envTag);
             diag.LastPrintOk = true;
+            diag.JobsPrintedTotal++;
             diag.PrintReason = $"OK → {printerName} (report offline)";
+            diag.LastError = $"report offline: {ex.Message}";
             diag.LastStage = PrintStage.ReportFailure;
             PrintFinished?.Invoke(true, $"{refId} → {printerName} · report_offline");
         }
