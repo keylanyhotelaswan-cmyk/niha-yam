@@ -11,6 +11,8 @@ public sealed class MainForm : Form
     private readonly TrayApplicationContext _app;
 
     private readonly Label _linkStatus;
+    private readonly Label _activityStatus;
+    private readonly Label _lastStage;
     private readonly Label _pairStatus;
     private readonly Label _device;
     private readonly Label _restaurant;
@@ -29,6 +31,7 @@ public sealed class MainForm : Form
     private CheckBox _chkAutoUpdate = null!;
     private Label _updateStatus = null!;
     private bool _settingsSyncing;
+    private BridgeLinkState _lastLinkState = BridgeLinkState.Connecting;
 
     public MainForm(
         BridgeConfig cfg,
@@ -59,14 +62,16 @@ public sealed class MainForm : Form
 
         var statusCard = NihaTheme.Card();
         statusCard.Dock = DockStyle.Top;
-        statusCard.Height = 200;
+        statusCard.Height = 300;
         statusCard.Padding = new Padding(16);
         PaintBorder(statusCard);
 
         _linkStatus = Row(statusCard, Ar.Status, Ar.Connecting, 8);
-        _pairStatus = Row(statusCard, Ar.Paired, Ar.NotPaired, 40);
-        _device = Row(statusCard, Ar.DeviceName, Environment.MachineName, 72);
-        _restaurant = Row(statusCard, Ar.ConnectionsTitle, FormatEnvironments(), 104, multiline: true);
+        _activityStatus = Row(statusCard, Ar.Activity, Ar.ActivityIdle, 36);
+        _lastStage = Row(statusCard, Ar.LastStage, Ar.None, 68, multiline: true);
+        _pairStatus = Row(statusCard, Ar.Paired, Ar.NotPaired, 148);
+        _device = Row(statusCard, Ar.DeviceName, Environment.MachineName, 180);
+        _restaurant = Row(statusCard, Ar.ConnectionsTitle, FormatEnvironments(), 212, multiline: true);
 
         var printersCard = NihaTheme.Card();
         printersCard.Dock = DockStyle.Top;
@@ -149,8 +154,13 @@ public sealed class MainForm : Form
         rePair.Width = 130;
         rePair.Click += (_, _) => RequestRePair();
 
+        var about = NihaTheme.OutlineButton(Ar.About);
+        about.Width = 120;
+        about.Click += (_, _) => ShowAbout();
+
         actions.Controls.Add(openPc);
         actions.Controls.Add(rePair);
+        actions.Controls.Add(about);
 
         var adminHint = new Label
         {
@@ -194,7 +204,9 @@ public sealed class MainForm : Form
 
         LoadPrinters();
         RefreshStatus(BridgeLinkState.Connecting);
+        RefreshActivity();
         _worker.StateChanged += OnWorkerState;
+        _worker.ActivityChanged += OnWorkerActivity;
         _worker.PrintFinished += OnPrintFinished;
 
         FormClosing += (_, e) =>
@@ -510,7 +522,47 @@ public sealed class MainForm : Form
     private void OnWorkerState(BridgeLinkState state)
     {
         if (IsDisposed) return;
-        BeginInvoke(() => RefreshStatus(state));
+        BeginInvoke(() =>
+        {
+            RefreshStatus(state);
+            RefreshActivity();
+        });
+    }
+
+    private void OnWorkerActivity()
+    {
+        if (IsDisposed) return;
+        BeginInvoke(RefreshActivity);
+    }
+
+    private void RefreshActivity()
+    {
+        _activityStatus.Text = _worker.Activity switch
+        {
+            BridgeActivity.WaitingForJobs => Ar.ActivityWaiting,
+            BridgeActivity.Claiming => Ar.ActivityClaiming,
+            BridgeActivity.ProcessingJob => Ar.ActivityProcessing,
+            BridgeActivity.Rendering => Ar.ActivityRendering,
+            BridgeActivity.Printing => Ar.ActivityPrinting,
+            BridgeActivity.Reporting => Ar.ActivityReporting,
+            _ => Ar.ActivityIdle,
+        };
+        _activityStatus.ForeColor = _worker.Activity switch
+        {
+            BridgeActivity.WaitingForJobs => NihaTheme.Success,
+            BridgeActivity.Idle => NihaTheme.Muted,
+            BridgeActivity.Claiming => NihaTheme.Muted,
+            _ => NihaTheme.Warning,
+        };
+
+        var stage = PrintStageLabels.En(_worker.LastStage);
+        var detail = string.IsNullOrWhiteSpace(_worker.LastStageDetail)
+            ? Ar.None
+            : _worker.LastStageDetail;
+        _lastStage.Text = detail == Ar.None ? stage : $"{stage} · {detail}";
+        _lastStage.ForeColor = _worker.LastStage == PrintStage.Failed
+            ? NihaTheme.Danger
+            : NihaTheme.Muted;
     }
 
     private void OnPrintFinished(bool ok, string summary)
@@ -527,8 +579,15 @@ public sealed class MainForm : Form
         });
     }
 
+    public void ShowAbout()
+    {
+        using var form = new AboutForm(_cfg, _worker, _lastLinkState);
+        form.ShowDialog(this);
+    }
+
     public void RefreshStatus(BridgeLinkState state)
     {
+        _lastLinkState = state;
         var paired = _cfg.PairedConnections().Any();
         _pairStatus.Text = paired ? Ar.Paired : Ar.NotPaired;
         _pairStatus.ForeColor = paired ? NihaTheme.Success : NihaTheme.Warning;
@@ -637,6 +696,7 @@ public sealed class MainForm : Form
         if (disposing)
         {
             _worker.StateChanged -= OnWorkerState;
+            _worker.ActivityChanged -= OnWorkerActivity;
             _worker.PrintFinished -= OnPrintFinished;
         }
         base.Dispose(disposing);

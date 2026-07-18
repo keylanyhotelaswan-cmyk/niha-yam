@@ -57,6 +57,11 @@ public sealed class TrayApplicationContext : ApplicationContext
         {
             await RunUpdateCheckAsync(interactive: true);
         });
+        menu.Items.Add(Ar.About, null, (_, _) =>
+        {
+            ShowMain();
+            _main?.ShowAbout();
+        });
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add(Ar.Exit, null, async (_, _) =>
         {

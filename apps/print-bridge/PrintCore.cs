@@ -314,18 +314,35 @@ public static class EscPosRenderer
 /// <summary>Windows spooler transport — success = bytes accepted (transport_ack), not paper-out.</summary>
 public static class SpoolerTransport
 {
-    public static void PrintRaw(string printerName, byte[] data, int copies)
+    public sealed record SpoolResult(bool Ok, string Stage, string Detail, int BytesWritten);
+
+    public static SpoolResult PrintRaw(
+        string printerName,
+        byte[] data,
+        int copies,
+        string? docName = null)
     {
+        if (string.IsNullOrWhiteSpace(printerName))
+            return new SpoolResult(false, "spooler_open", "printerName empty", 0);
+        if (data is null || data.Length == 0)
+            return new SpoolResult(false, "spooler_write", "payload bytes empty", 0);
+
         copies = Math.Clamp(copies, 1, 5);
+        var totalWritten = 0;
         for (var i = 0; i < copies; i++)
         {
-            if (!RawPrinterHelper.SendBytesToPrinter(printerName, data))
-                throw new InvalidOperationException($"SPOOLER_REJECTED:{printerName}");
+            var r = RawPrinterHelper.SendBytesToPrinter(
+                printerName,
+                data,
+                docName ?? "NIHA Print Job");
+            if (!r.Ok) return r;
+            totalWritten += r.BytesWritten;
         }
+        return new SpoolResult(true, "spooler_ok", $"copies={copies} bytes={data.Length}", totalWritten);
     }
 }
 
-/// <summary>Minimal raw printer send via Winspool.</summary>
+/// <summary>Minimal raw printer send via Winspool — reports exact failing Win32 stage.</summary>
 internal static class RawPrinterHelper
 {
     [System.Runtime.InteropServices.DllImport("winspool.drv", SetLastError = true, CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
@@ -357,35 +374,67 @@ internal static class RawPrinterHelper
         public string pDataType;
     }
 
-    public static bool SendBytesToPrinter(string printerName, byte[] bytes)
+    public static SpoolerTransport.SpoolResult SendBytesToPrinter(
+        string printerName,
+        byte[] bytes,
+        string docName)
     {
+        static string WinErr(string stage) =>
+            $"{stage} win32={System.Runtime.InteropServices.Marshal.GetLastWin32Error()}";
+
         if (!OpenPrinter(printerName, out var h, IntPtr.Zero))
-            return false;
+            return new SpoolerTransport.SpoolResult(false, "spooler_open", WinErr($"OpenPrinter('{printerName}')"), 0);
+
         try
         {
-            var di = new DOC_INFO_1 { pDocName = "NIHA Print Job", pDataType = "RAW", pOutputFile = null };
-            if (!StartDocPrinter(h, 1, ref di)) return false;
+            var di = new DOC_INFO_1
+            {
+                pDocName = docName,
+                pDataType = "RAW",
+                pOutputFile = null,
+            };
+            if (!StartDocPrinter(h, 1, ref di))
+                return new SpoolerTransport.SpoolResult(false, "spooler_start_doc", WinErr("StartDocPrinter RAW"), 0);
+
             try
             {
-                if (!StartPagePrinter(h)) return false;
+                if (!StartPagePrinter(h))
+                    return new SpoolerTransport.SpoolResult(false, "spooler_start_doc", WinErr("StartPagePrinter"), 0);
+
                 var unmanaged = System.Runtime.InteropServices.Marshal.AllocCoTaskMem(bytes.Length);
                 try
                 {
                     System.Runtime.InteropServices.Marshal.Copy(bytes, 0, unmanaged, bytes.Length);
-                    if (!WritePrinter(h, unmanaged, bytes.Length, out _))
-                        return false;
+                    if (!WritePrinter(h, unmanaged, bytes.Length, out var written))
+                        return new SpoolerTransport.SpoolResult(false, "spooler_write", WinErr("WritePrinter"), written);
+
+                    if (written != bytes.Length)
+                    {
+                        return new SpoolerTransport.SpoolResult(
+                            false,
+                            "spooler_write",
+                            $"partial write written={written} expected={bytes.Length}",
+                            written);
+                    }
+
+                    if (!EndPagePrinter(h))
+                        return new SpoolerTransport.SpoolResult(false, "spooler_write", WinErr("EndPagePrinter"), written);
+
+                    return new SpoolerTransport.SpoolResult(
+                        true,
+                        "spooler_ok",
+                        $"WritePrinter ok written={written} printer='{printerName}'",
+                        written);
                 }
                 finally
                 {
                     System.Runtime.InteropServices.Marshal.FreeCoTaskMem(unmanaged);
                 }
-                EndPagePrinter(h);
             }
             finally
             {
                 EndDocPrinter(h);
             }
-            return true;
         }
         finally
         {

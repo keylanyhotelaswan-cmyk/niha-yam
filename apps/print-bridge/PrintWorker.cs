@@ -162,7 +162,17 @@ public sealed class PrintWorker
     /// <summary>Last claim/diag line for Advanced diagnostics (support).</summary>
     public string LastClaimSummary { get; private set; } = Ar.None;
 
+    /// <summary>Operator-visible print activity (Waiting / Printing…).</summary>
+    public BridgeActivity Activity { get; private set; } = BridgeActivity.Idle;
+
+    /// <summary>Last precise pipeline stage + detail for support.</summary>
+    public PrintStage LastStage { get; private set; } = PrintStage.Idle;
+    public string LastStageDetail { get; private set; } = "";
+
+    private bool _linkEverConnected;
+
     public event Action<BridgeLinkState>? StateChanged;
+    public event Action? ActivityChanged;
     public event Action<bool, string>? PrintFinished;
 
     public PrintWorker(BridgeConfig cfg, BridgeLogger log, OfflineStore offline)
@@ -190,6 +200,21 @@ public sealed class PrintWorker
 
     private void SetState(BridgeLinkState state) => StateChanged?.Invoke(state);
 
+    private void SetActivity(BridgeActivity activity)
+    {
+        if (Activity == activity) return;
+        Activity = activity;
+        ActivityChanged?.Invoke();
+    }
+
+    private void SetStage(PrintStage stage, string detail, string? env = null)
+    {
+        LastStage = stage;
+        LastStageDetail = string.IsNullOrWhiteSpace(env) ? detail : $"[{env}] {detail}";
+        var tag = PrintStageLabels.En(stage);
+        _log.Info($"[stage={tag}] {LastStageDetail}");
+    }
+
     private async Task LoopAsync(CancellationToken ct)
     {
         var restarted = true;
@@ -201,13 +226,21 @@ public sealed class PrintWorker
                 var paired = _cfg.PairedConnections().ToList();
                 if (paired.Count == 0)
                 {
+                    _linkEverConnected = false;
+                    SetActivity(BridgeActivity.Idle);
+                    SetStage(PrintStage.Idle, "not paired");
                     SetState(BridgeLinkState.NotPaired);
                     await Task.Delay(_cfg.PollMs, ct);
                     continue;
                 }
 
-                SetState(BridgeLinkState.Connecting);
+                // Do not flash "Connecting" every poll — only until first successful heartbeat.
+                if (!_linkEverConnected)
+                    SetState(BridgeLinkState.Connecting);
+
+                SetStage(PrintStage.PollStart, $"envs={paired.Count}");
                 var anyConnected = false;
+                var anyJobsThisPoll = false;
                 var printers = GetCachedPrinters();
 
                 foreach (var conn in paired)
@@ -220,26 +253,31 @@ public sealed class PrintWorker
                         conn.LastHeartbeatAt = DateTimeOffset.Now;
                         conn.LastError = null;
                         anyConnected = true;
+                        SetStage(PrintStage.HeartbeatOk, $"bridgeId={conn.BridgeId ?? "?"}", envTag);
 
                         try
                         {
                             await api.ReportPrintersAsync(printers, ct);
+                            _log.Info($"[{envTag}] report_printers: count={printers.Count}");
                         }
                         catch (Exception ex)
                         {
-                            _log.Error($"[{envTag}] report printers: {ex.Message}");
+                            _log.Error($"[{envTag}] report_printers FAIL: {ex.Message}");
                         }
 
                         await FlushOfflineAsync(api, conn.SupabaseUrl, ct);
+
+                        SetActivity(BridgeActivity.Claiming);
+                        SetStage(PrintStage.ClaimCall, $"limit=10 bridgeId={conn.BridgeId ?? "?"}", envTag);
                         var jobs = await api.ClaimAsync(10, ct);
-                        var claimLine =
-                            $"[{envTag}] poll claim: found={jobs.Count} bridgeId={conn.BridgeId ?? "?"} " +
-                            $"tokenPrefix={(conn.BridgeToken is { Length: >= 8 } t ? t[..8] : "?")}";
-                        _log.Info(claimLine);
                         LastClaimSummary = $"{envTag}: found={jobs.Count}";
 
                         if (jobs.Count == 0)
                         {
+                            SetStage(
+                                PrintStage.ClaimEmpty,
+                                $"no jobs claimed (gate/filter/empty queue). bridgeId={conn.BridgeId ?? "?"}",
+                                envTag);
                             if (DateTimeOffset.UtcNow - _lastEmptyClaimDiagAt > TimeSpan.FromSeconds(30))
                             {
                                 _lastEmptyClaimDiagAt = DateTimeOffset.UtcNow;
@@ -249,30 +287,41 @@ public sealed class PrintWorker
                                     _log.Info($"[{envTag}] claim_diag: {diag}");
                                     var shortDiag = diag.Length > 160 ? diag[..160] + "…" : diag;
                                     LastClaimSummary = $"{envTag}: found=0 · {shortDiag}";
+                                    SetStage(PrintStage.ClaimEmpty, $"claim_diag: {shortDiag}", envTag);
                                 }
                                 catch (Exception dex)
                                 {
-                                    _log.Error($"[{envTag}] claim_diag: {dex.Message}");
+                                    _log.Error($"[{envTag}] claim_diag FAIL: {dex.Message}");
                                 }
                             }
                         }
                         else
                         {
+                            anyJobsThisPoll = true;
+                            SetStage(
+                                PrintStage.ClaimReceived,
+                                $"found={jobs.Count} first={jobs[0].Reference ?? jobs[0].Id.ToString()}",
+                                envTag);
                             foreach (var j in jobs)
+                            {
                                 _log.Info(
-                                    $"[{envTag}] claimed job {j.Reference ?? j.Id.ToString()} " +
-                                    $"printerId={j.Printer?.Id} win={ResolvePrinterName(j)}");
+                                    $"[{envTag}] CLAIM_OK ref={j.Reference ?? j.Id.ToString()} " +
+                                    $"jobId={j.Id} printerId={j.Printer?.Id} " +
+                                    $"printerName={j.Printer?.Name} " +
+                                    $"wantedWin={PeekWantedPrinter(j)}");
+                            }
                             LastClaimSummary =
                                 $"{envTag}: found={jobs.Count} · {jobs[0].Reference ?? jobs[0].Id.ToString()}";
                         }
 
                         foreach (var job in jobs)
-                            await ProcessJobAsync(api, conn.SupabaseUrl, job, ct);
+                            await ProcessJobAsync(api, conn.SupabaseUrl, envTag, job, ct);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         conn.LastError = ex.Message;
-                        _log.Error($"[{envTag}] loop: {ex.Message}");
+                        SetStage(PrintStage.Failed, $"loop exception: {ex.Message}", envTag);
+                        _log.Error($"[{envTag}] loop FAIL at stage={PrintStageLabels.En(LastStage)}: {ex.Message}");
                     }
                 }
 
@@ -280,7 +329,19 @@ public sealed class PrintWorker
                 ConfigStore.SyncLegacyFields(_cfg);
                 MaybeSaveConfig();
 
-                SetState(anyConnected ? BridgeLinkState.Connected : BridgeLinkState.Disconnected);
+                if (anyConnected)
+                {
+                    _linkEverConnected = true;
+                    SetState(BridgeLinkState.Connected);
+                    if (!anyJobsThisPoll)
+                        SetActivity(BridgeActivity.WaitingForJobs);
+                }
+                else
+                {
+                    _linkEverConnected = false;
+                    SetActivity(BridgeActivity.Idle);
+                    SetState(BridgeLinkState.Disconnected);
+                }
             }
             catch (OperationCanceledException) { break; }
 
@@ -335,88 +396,172 @@ public sealed class PrintWorker
     private async Task ProcessJobAsync(
         SupabaseBridgeApi api,
         string connectionKey,
+        string envTag,
         ClaimedJob job,
         CancellationToken ct)
     {
+        var refId = job.Reference ?? job.Id.ToString();
+        SetActivity(BridgeActivity.ProcessingJob);
+        SetStage(PrintStage.JobStart, $"ref={refId} jobId={job.Id}", envTag);
+
         // BP-12: never auto-print past TTL
         if (job.ExpiresAt is { } exp && exp < DateTimeOffset.UtcNow)
         {
-            _log.Info($"skip expired job {job.Id}");
+            SetStage(PrintStage.TtlExpired, $"ref={refId} expiredAt={exp:O}", envTag);
             try
             {
                 await api.ReportAsync(job.Id, false, "TTL_EXPIRED", "Job expired before print", "transport_ack", ct);
+                SetStage(PrintStage.ReportFailure, $"TTL reported ref={refId}", envTag);
             }
             catch (Exception ex)
             {
                 _offline.EnqueueReport(job.Id, false, "TTL_EXPIRED", ex.Message, "transport_ack", connectionKey);
+                SetStage(PrintStage.ReportFailure, $"TTL report queued offline: {ex.Message}", envTag);
             }
-            PrintFinished?.Invoke(false, $"{job.Reference ?? job.Id.ToString()} · TTL");
+            PrintFinished?.Invoke(false, $"{refId} · stopped_at=ttl_expired");
             return;
         }
 
+        byte[] bytes;
         try
         {
-            var bytes = EscPosRenderer.Render(job);
-            var printerName = ResolvePrinterName(job);
-            var copies = job.Printer?.DefaultCopies ?? 1;
-            SpoolerTransport.PrintRaw(printerName, bytes, copies);
-            // BP-13: spooler accept only — not paper-out
-            const string delivery = "transport_ack";
-            try
-            {
-                await api.ReportAsync(job.Id, true, null, null, delivery, ct);
-            }
-            catch
-            {
-                _offline.EnqueueReport(job.Id, true, null, null, delivery, connectionKey);
-            }
-            _log.Info($"printed job {job.Id} → {printerName} ({delivery})");
-            PrintFinished?.Invoke(true, $"{job.Reference ?? "job"} → {printerName}");
+            SetActivity(BridgeActivity.Rendering);
+            SetStage(PrintStage.RenderStart, $"ref={refId}", envTag);
+            bytes = EscPosRenderer.Render(job);
+            SetStage(PrintStage.RenderOk, $"ref={refId} bytes={bytes.Length}", envTag);
         }
         catch (Exception ex)
         {
-            _log.Error($"print {job.Id}: {ex.Message}");
-            try
-            {
-                await api.ReportAsync(job.Id, false, "PRINT_FAILED", ex.Message, "transport_ack", ct);
-            }
-            catch
-            {
-                _offline.EnqueueReport(job.Id, false, "PRINT_FAILED", ex.Message, "transport_ack", connectionKey);
-            }
-            PrintFinished?.Invoke(false, ex.Message);
+            SetStage(PrintStage.Failed, $"render failed ref={refId}: {ex.Message}", envTag);
+            await ReportFailAsync(api, connectionKey, job, "RENDER_FAILED", ex.Message, ct, envTag);
+            PrintFinished?.Invoke(false, $"{refId} · stopped_at=render · {ex.Message}");
+            return;
+        }
+
+        string printerName;
+        string? wanted;
+        try
+        {
+            wanted = PeekWantedPrinter(job);
+            printerName = ResolvePrinterName(job);
+            SetStage(
+                PrintStage.PrinterResolve,
+                $"ref={refId} wanted='{wanted ?? "(null)"}' resolved='{printerName}' copies={job.Printer?.DefaultCopies ?? 1}",
+                envTag);
+        }
+        catch (Exception ex)
+        {
+            SetStage(PrintStage.Failed, $"printer resolve failed ref={refId}: {ex.Message}", envTag);
+            await ReportFailAsync(api, connectionKey, job, "PRINTER_RESOLVE_FAILED", ex.Message, ct, envTag);
+            PrintFinished?.Invoke(false, $"{refId} · stopped_at=printer_resolve · {ex.Message}");
+            return;
+        }
+
+        SetActivity(BridgeActivity.Printing);
+        SetStage(PrintStage.SpoolerOpen, $"ref={refId} OpenPrinter('{printerName}')", envTag);
+        var copies = job.Printer?.DefaultCopies ?? 1;
+        var spool = SpoolerTransport.PrintRaw(
+            printerName,
+            bytes,
+            copies,
+            docName: $"NIHA {refId}");
+
+        if (!spool.Ok)
+        {
+            SetStage(PrintStage.Failed, $"ref={refId} stopped_at={spool.Stage} · {spool.Detail}", envTag);
+            await ReportFailAsync(
+                api,
+                connectionKey,
+                job,
+                "SPOOLER_FAILED",
+                $"{spool.Stage}: {spool.Detail}",
+                ct,
+                envTag);
+            PrintFinished?.Invoke(false, $"{refId} · stopped_at={spool.Stage} · {spool.Detail}");
+            return;
+        }
+
+        SetStage(PrintStage.SpoolerOk, $"ref={refId} {spool.Detail}", envTag);
+
+        // BP-13: only mark success after spooler accepted full byte write — not paper-out proof.
+        SetActivity(BridgeActivity.Reporting);
+        const string delivery = "transport_ack";
+        try
+        {
+            await api.ReportAsync(job.Id, true, null, null, delivery, ct);
+            SetStage(PrintStage.ReportSuccess, $"ref={refId} → {printerName} delivery={delivery}", envTag);
+            SetStage(PrintStage.Done, $"ref={refId} pipeline complete", envTag);
+            PrintFinished?.Invoke(true, $"{refId} → {printerName}");
+        }
+        catch (Exception ex)
+        {
+            _offline.EnqueueReport(job.Id, true, null, null, delivery, connectionKey);
+            SetStage(
+                PrintStage.ReportFailure,
+                $"ref={refId} spooler OK but report failed (queued offline): {ex.Message}",
+                envTag);
+            // Paper may have printed — still surface success for operator with note.
+            PrintFinished?.Invoke(true, $"{refId} → {printerName} · report_offline");
         }
     }
 
-    private static string ResolvePrinterName(ClaimedJob job)
+    private async Task ReportFailAsync(
+        SupabaseBridgeApi api,
+        string connectionKey,
+        ClaimedJob job,
+        string code,
+        string message,
+        CancellationToken ct,
+        string envTag)
     {
-        string? wanted = null;
+        SetActivity(BridgeActivity.Reporting);
+        try
+        {
+            await api.ReportAsync(job.Id, false, code, message, "transport_ack", ct);
+            SetStage(PrintStage.ReportFailure, $"reported {code}: {message}", envTag);
+        }
+        catch (Exception ex)
+        {
+            _offline.EnqueueReport(job.Id, false, code, message, "transport_ack", connectionKey);
+            SetStage(PrintStage.ReportFailure, $"report queued offline ({code}): {ex.Message}", envTag);
+        }
+    }
 
+    private static string? PeekWantedPrinter(ClaimedJob job)
+    {
         if (job.Printer?.Address is JsonElement el &&
             el.ValueKind == JsonValueKind.Object)
         {
             if (el.TryGetProperty("windows_printer_name", out var wp1))
-                wanted = wp1.GetString();
-            if (string.IsNullOrWhiteSpace(wanted) &&
-                el.TryGetProperty("windows_printer", out var wp2))
-                wanted = wp2.GetString();
-        }
-
-        if (string.IsNullOrWhiteSpace(wanted))
-        {
-            try
             {
-                if (job.Payload is JsonElement payload &&
-                    payload.ValueKind == JsonValueKind.Object &&
-                    payload.TryGetProperty("windows_printer_name", out var fromPayload))
-                    wanted = fromPayload.GetString();
+                var s = wp1.GetString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
             }
-            catch { /* ignore */ }
+            if (el.TryGetProperty("windows_printer", out var wp2))
+            {
+                var s = wp2.GetString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
         }
 
-        if (string.IsNullOrWhiteSpace(wanted))
-            wanted = job.Printer?.Name;
+        try
+        {
+            if (job.Payload is JsonElement payload &&
+                payload.ValueKind == JsonValueKind.Object &&
+                payload.TryGetProperty("windows_printer_name", out var fromPayload))
+            {
+                var s = fromPayload.GetString();
+                if (!string.IsNullOrWhiteSpace(s)) return s;
+            }
+        }
+        catch { /* ignore */ }
 
+        return job.Printer?.Name;
+    }
+
+    private static string ResolvePrinterName(ClaimedJob job)
+    {
+        var wanted = PeekWantedPrinter(job);
         // Never hard-fail on a stale Windows queue name (copy 1 / USB / new PC).
         return WindowsPrinterInventory.ResolveLocalName(wanted);
     }

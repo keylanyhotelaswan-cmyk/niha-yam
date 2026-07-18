@@ -39,6 +39,16 @@ public static class Ar
     public const string NotPaired = "غير مقترن";
     public const string Paired = "مقترن";
 
+    public const string Activity = "نشاط الطباعة";
+    public const string ActivityIdle = "—";
+    public const string ActivityWaiting = "في انتظار المهام";
+    public const string ActivityClaiming = "جاري المطالبة بالمهام…";
+    public const string ActivityProcessing = "جاري معالجة مهمة…";
+    public const string ActivityRendering = "جاري تجهيز الإيصال…";
+    public const string ActivityPrinting = "جاري الإرسال للطابعة…";
+    public const string ActivityReporting = "جاري تحديث حالة المهمة…";
+    public const string LastStage = "آخر مرحلة";
+
     public const string DeviceName = "اسم الجهاز";
     public const string Restaurant = "الاتصالات";
     public const string ConnectionsTitle = "الاتصالات";
@@ -86,14 +96,19 @@ public static class Ar
     public const string UpdateTitle = "تحديث NIHA Print Bridge";
     public const string Settings = "إعدادات الجهاز";
 
+    public const string About = "حول البرنامج";
+    public const string AboutTitle = "حول NIHA Print Bridge";
+    public const string CopyDiagnostics = "نسخ معلومات التشخيص";
+    public const string DiagnosticsCopied = "تم النسخ — أرسل النص للدعم الفني";
+
     public const string Advanced = "التشخيص المتقدم";
     public const string HideAdvanced = "إخفاء التشخيص";
     public const string Version = "الإصدار";
     public const string BridgeId = "معرّف الجسر";
-    public const string Heartbeat = "آخر نبضة";
+    public const string Heartbeat = "آخر وقت اتصال";
     public const string LastClaim = "آخر مطالبة";
     public const string InstallPath = "مسار التثبيت";
-    public const string DataPath = "مسار البيانات";
+    public const string DataPath = "مسار حفظ البيانات";
     public const string OpenLogs = "فتح مجلد السجلات";
     public const string TechNote = "للدعم الفني فقط — لا يحتاجها مدير المطعم.";
 

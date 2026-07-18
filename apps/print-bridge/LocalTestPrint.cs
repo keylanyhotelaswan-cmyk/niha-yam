@@ -49,6 +49,9 @@ public static class LocalTestPrint
         doc.Line("If Arabic letters are joined, shaping works.", EscPosAlign.Center, fontSize: 14f);
 
         doc.Cut();
-        SpoolerTransport.PrintRaw(printerName, doc.ToBytes(), 1);
+        var bytes = doc.ToBytes();
+        var r = SpoolerTransport.PrintRaw(printerName, bytes, 1, "NIHA Local Test");
+        if (!r.Ok)
+            throw new InvalidOperationException($"{r.Stage}: {r.Detail}");
     }
 }

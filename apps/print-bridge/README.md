@@ -65,6 +65,12 @@ Arabic lines are drawn with **GDI+ Uniscribe** (joined RTL), then sent as
 
 Tray → **التشغيل مع Windows**.
 
+## About / support diagnostics
+
+Main window or tray → **حول البرنامج**:
+- version, install path, data path, last heartbeat
+- **نسخ معلومات التشخيص** — plain text for WhatsApp/email support (no screenshots)
+
 ## Logs (advanced)
 
 `%LocalAppData%\NihaPrintBridge\bridge.log`
