@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
 
 /**
  * Operational Hardening — Shift / handover stress + realistic failure modes (OH-4)
@@ -113,14 +113,23 @@ async function clearPending(rpc) {
 }
 
 async function main() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anonKey = env.VITE_SUPABASE_ANON_KEY
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
-  assertSupabaseUrl(url)
+  assertTestingTarget(url)
 
-  const username = readArg('--username', 'abomalek').trim().toLowerCase()
-  const password = readArg('--password', '741523')
+  const username = readArg(
+    '--username',
+    env.TESTING_CASHIER_USERNAME || env.TESTING_MANAGER_USERNAME || 'abomalek',
+  )
+    .trim()
+    .toLowerCase()
+  const password = readArg(
+    '--password',
+    env.TESTING_CASHIER_PASSWORD || env.TESTING_MANAGER_PASSWORD || '',
+  )
+  if (!password) throw new Error('Missing Testing password (TESTING_CASHIER_PASSWORD)')
   const supabase = createClient(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
@@ -377,7 +386,7 @@ async function main() {
     `ok=${raceOk} denied=${raceDenied}`,
   )
 
-  // Handover print enqueue (if available)
+  // Handover print enqueue + full-report snapshot shape
   if (hidA) {
     const printHo = await rpc('m6_enqueue_shift_handover_print', {
       p_handover_id: hidA,
@@ -388,6 +397,55 @@ async function main() {
       !printHo.error || String(printHo.error.message).includes('NOT_FOUND'),
       printHo.error?.message ?? 'enqueued',
     )
+
+    const snapRes = await rpc('m6_build_handover_print_snapshot', {
+      p_handover_id: hidA,
+      p_phase: 'handover',
+    })
+    const snap = snapRes.data
+    const ops = snap?.ops
+    const cash = snap?.cash
+    const fullOk =
+      !snapRes.error &&
+      typeof snap?.title_ar === 'string' &&
+      String(snap.title_ar).includes('تقرير') &&
+      snap?.document_type === 'shift_handover' &&
+      snap?.layout == null &&
+      ops != null &&
+      typeof ops.sales_total === 'number' &&
+      typeof ops.orders_count === 'number' &&
+      typeof ops.avg_ticket === 'number' &&
+      cash != null &&
+      typeof cash.expected_cash === 'number' &&
+      Array.isArray(snap.top_items_by_revenue) &&
+      Array.isArray(snap.top_items_by_qty) &&
+      Array.isArray(snap.payment_methods)
+    record(
+      '24b handover full report snapshot',
+      fullOk,
+      snapRes.error?.message ??
+        `title=${snap?.title_ar} orders=${ops?.orders_count} sales=${ops?.sales_total}`,
+    )
+
+    if (printHo.data && serviceKey) {
+      const admin = createClient(url, serviceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+      const { data: job } = await admin
+        .from('print_jobs')
+        .select('id, kind, template_id, payload')
+        .eq('id', printHo.data)
+        .maybeSingle()
+      const payload = job?.payload ?? {}
+      record(
+        '24c handover job kind/template',
+        job?.kind === 'shift_handover' &&
+          job?.template_id == null &&
+          payload?.document_type === 'shift_handover' &&
+          payload?.data_snapshot?.layout == null,
+        `kind=${job?.kind} tpl=${job?.template_id}`,
+      )
+    }
   }
 
   if (!hasFlag('--no-cleanup')) {
