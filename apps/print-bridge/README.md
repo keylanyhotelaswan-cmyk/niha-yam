@@ -65,6 +65,13 @@ Arabic lines are drawn with **GDI+ Uniscribe** (joined RTL), then sent as
 
 Tray → **التشغيل مع Windows**.
 
+## Manage connections (cashier PCs)
+
+Main window or tray → **إدارة الاتصالات**:
+- Per-env: reconnect / delete / set default
+- **إعادة ضبط الاتصالات** — clears `Connections[]` only (keeps autostart, update prefs, install path)
+- Per-env diagnostics: Last Poll · Claim count · Print result · Reason · pipeline
+
 ## About / support diagnostics
 
 Main window or tray → **حول البرنامج**:

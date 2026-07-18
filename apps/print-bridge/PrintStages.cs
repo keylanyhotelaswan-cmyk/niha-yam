@@ -36,6 +36,36 @@ public enum BridgeActivity
     Reporting,
 }
 
+/// <summary>Per-connection runtime diagnostics (not persisted).</summary>
+public sealed class ConnectionPollDiag
+{
+    public DateTimeOffset? LastPollAt { get; set; }
+    public bool LinkOk { get; set; }
+    public int LastClaimCount { get; set; }
+    public string? ClaimReason { get; set; }
+    public string? LastJobRef { get; set; }
+    public bool? LastPrintOk { get; set; }
+    public string? PrintReason { get; set; }
+    public PrintStage LastStage { get; set; } = PrintStage.Idle;
+    public string LastStageDetail { get; set; } = "";
+
+    /// <summary>Short pipeline: Link → Claim → Match → Print → Success (or where it stopped).</summary>
+    public string PipelineSummary
+    {
+        get
+        {
+            if (!LinkOk) return "Link ✗";
+            if (LastClaimCount <= 0)
+                return $"Link ✓ → Claim 0 · {ClaimReason ?? "empty/gated"}";
+            if (LastPrintOk == true)
+                return $"Link ✓ → Claim {LastClaimCount} → Print ✓ → Success";
+            if (LastPrintOk == false)
+                return $"Link ✓ → Claim {LastClaimCount} → Print ✗ · {PrintReason ?? PrintStageLabels.En(LastStage)}";
+            return $"Link ✓ → Claim {LastClaimCount} → …";
+        }
+    }
+}
+
 public static class PrintStageLabels
 {
     public static string En(PrintStage s) => s switch

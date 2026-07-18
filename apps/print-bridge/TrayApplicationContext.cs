@@ -51,6 +51,11 @@ public sealed class TrayApplicationContext : ApplicationContext
         menu.RightToLeft = RightToLeft.Yes;
         menu.Items.Add(Ar.ShowWindow, null, (_, _) => ShowMain());
         menu.Items.Add(Ar.RePair, null, (_, _) => DoPair(force: true));
+        menu.Items.Add(Ar.ManageConnections, null, (_, _) =>
+        {
+            ShowMain();
+            _main?.ShowConnections();
+        });
         menu.Items.Add(_autostartItem);
         menu.Items.Add(_autoUpdateItem);
         menu.Items.Add(Ar.CheckUpdate, null, async (_, _) =>

@@ -97,19 +97,71 @@ public static class ConfigStore
     public static void SyncLegacyFields(BridgeConfig cfg)
     {
         var primary = cfg.PrimaryConnection();
-        if (primary is null) return;
+        if (primary is null)
+        {
+            cfg.BridgeToken = null;
+            cfg.BridgeId = null;
+            cfg.RestaurantName = null;
+            cfg.RestaurantId = null;
+            cfg.LastHeartbeatAt = null;
+            return;
+        }
         cfg.SupabaseUrl = primary.SupabaseUrl;
         cfg.AnonKey = primary.AnonKey;
         cfg.BridgeToken = primary.BridgeToken;
         cfg.BridgeId = primary.BridgeId;
         cfg.RestaurantName = primary.RestaurantName;
         cfg.RestaurantId = primary.RestaurantId;
-        cfg.PrintCenterUrl = primary.PrintCenterUrl;
+        cfg.PrintCenterUrl = primary.PrintCenterUrl ?? cfg.PrintCenterUrl;
         cfg.LastHeartbeatAt = cfg.PairedConnections()
             .Select(c => c.LastHeartbeatAt)
             .Where(t => t is not null)
             .DefaultIfEmpty(null)
             .Max();
+    }
+
+    /// <summary>Remove all paired cloud connections — keeps autostart/update/printer prefs.</summary>
+    public static void ClearConnectionsOnly(BridgeConfig cfg)
+    {
+        cfg.Connections = new List<BridgeConnection>();
+        cfg.BridgeToken = null;
+        cfg.BridgeId = null;
+        cfg.RestaurantName = null;
+        cfg.RestaurantId = null;
+        cfg.LastHeartbeatAt = null;
+        cfg.LastPrintSummary = null;
+        cfg.LastPrintAt = null;
+        cfg.LastPrintOk = null;
+        // Leave PrintCenterUrl / AutoUpdate / StartWithWindows / ShowVirtualPrinters / PollMs.
+        // Clear cloud endpoints so next pair uses QR/token or bridge-defaults.json.
+        cfg.SupabaseUrl = "";
+        cfg.AnonKey = "";
+        Save(cfg);
+    }
+
+    public static void RemoveConnection(BridgeConfig cfg, string connectionId)
+    {
+        Normalize(cfg);
+        cfg.Connections.RemoveAll(c =>
+            string.Equals(c.Id, connectionId, StringComparison.OrdinalIgnoreCase));
+        if (!cfg.Connections.Any(c => c.IsDefault) && cfg.Connections.Count > 0)
+        {
+            var prefer = cfg.Connections.FirstOrDefault(c =>
+                string.Equals(c.Env, "production", StringComparison.OrdinalIgnoreCase))
+                ?? cfg.Connections[0];
+            prefer.IsDefault = true;
+        }
+        SyncLegacyFields(cfg);
+        Save(cfg);
+    }
+
+    public static void SetDefaultConnection(BridgeConfig cfg, string connectionId)
+    {
+        Normalize(cfg);
+        foreach (var c in cfg.Connections)
+            c.IsDefault = string.Equals(c.Id, connectionId, StringComparison.OrdinalIgnoreCase);
+        SyncLegacyFields(cfg);
+        Save(cfg);
     }
 
     private static void ApplyDefaults(BridgeConfig cfg)
@@ -169,11 +221,28 @@ public sealed class PrintWorker
     public PrintStage LastStage { get; private set; } = PrintStage.Idle;
     public string LastStageDetail { get; private set; } = "";
 
+    private readonly Dictionary<string, ConnectionPollDiag> _connDiags = new(StringComparer.OrdinalIgnoreCase);
     private bool _linkEverConnected;
 
     public event Action<BridgeLinkState>? StateChanged;
     public event Action? ActivityChanged;
     public event Action<bool, string>? PrintFinished;
+
+    public ConnectionPollDiag GetConnDiag(BridgeConnection conn)
+    {
+        var key = ConnKey(conn);
+        if (!_connDiags.TryGetValue(key, out var d))
+        {
+            d = new ConnectionPollDiag();
+            _connDiags[key] = d;
+        }
+        return d;
+    }
+
+    public IReadOnlyDictionary<string, ConnectionPollDiag> AllConnDiags => _connDiags;
+
+    private static string ConnKey(BridgeConnection conn) =>
+        !string.IsNullOrWhiteSpace(conn.Id) ? conn.Id : conn.SupabaseUrl;
 
     public PrintWorker(BridgeConfig cfg, BridgeLogger log, OfflineStore offline)
     {
@@ -246,6 +315,8 @@ public sealed class PrintWorker
                 foreach (var conn in paired)
                 {
                     var envTag = conn.Env;
+                    var diag = GetConnDiag(conn);
+                    diag.LastPollAt = DateTimeOffset.Now;
                     var api = new SupabaseBridgeApi(conn);
                     try
                     {
@@ -253,7 +324,9 @@ public sealed class PrintWorker
                         conn.LastHeartbeatAt = DateTimeOffset.Now;
                         conn.LastError = null;
                         anyConnected = true;
+                        diag.LinkOk = true;
                         SetStage(PrintStage.HeartbeatOk, $"bridgeId={conn.BridgeId ?? "?"}", envTag);
+                        diag.LastStage = PrintStage.HeartbeatOk;
 
                         try
                         {
@@ -270,22 +343,30 @@ public sealed class PrintWorker
                         SetActivity(BridgeActivity.Claiming);
                         SetStage(PrintStage.ClaimCall, $"limit=10 bridgeId={conn.BridgeId ?? "?"}", envTag);
                         var jobs = await api.ClaimAsync(10, ct);
+                        diag.LastClaimCount = jobs.Count;
                         LastClaimSummary = $"{envTag}: found={jobs.Count}";
 
                         if (jobs.Count == 0)
                         {
+                            var reason = string.Equals(envTag, "testing", StringComparison.OrdinalIgnoreCase)
+                                ? "empty queue or Testing session disabled"
+                                : "empty queue or jobs routed elsewhere";
+                            diag.ClaimReason = reason;
+                            diag.LastStage = PrintStage.ClaimEmpty;
                             SetStage(
                                 PrintStage.ClaimEmpty,
-                                $"no jobs claimed (gate/filter/empty queue). bridgeId={conn.BridgeId ?? "?"}",
+                                $"no jobs claimed ({reason}). bridgeId={conn.BridgeId ?? "?"}",
                                 envTag);
                             if (DateTimeOffset.UtcNow - _lastEmptyClaimDiagAt > TimeSpan.FromSeconds(30))
                             {
                                 _lastEmptyClaimDiagAt = DateTimeOffset.UtcNow;
                                 try
                                 {
-                                    var diag = await api.DiagnoseClaimAsync(ct);
-                                    _log.Info($"[{envTag}] claim_diag: {diag}");
-                                    var shortDiag = diag.Length > 160 ? diag[..160] + "…" : diag;
+                                    var claimDiag = await api.DiagnoseClaimAsync(ct);
+                                    _log.Info($"[{envTag}] claim_diag: {claimDiag}");
+                                    var parsed = SummarizeClaimDiag(claimDiag, envTag);
+                                    diag.ClaimReason = parsed;
+                                    var shortDiag = parsed.Length > 160 ? parsed[..160] + "…" : parsed;
                                     LastClaimSummary = $"{envTag}: found=0 · {shortDiag}";
                                     SetStage(PrintStage.ClaimEmpty, $"claim_diag: {shortDiag}", envTag);
                                 }
@@ -298,9 +379,12 @@ public sealed class PrintWorker
                         else
                         {
                             anyJobsThisPoll = true;
+                            diag.ClaimReason = $"claimed {jobs.Count}";
+                            diag.LastJobRef = jobs[0].Reference ?? jobs[0].Id.ToString();
+                            diag.LastStage = PrintStage.ClaimReceived;
                             SetStage(
                                 PrintStage.ClaimReceived,
-                                $"found={jobs.Count} first={jobs[0].Reference ?? jobs[0].Id.ToString()}",
+                                $"found={jobs.Count} first={diag.LastJobRef}",
                                 envTag);
                             foreach (var j in jobs)
                             {
@@ -311,15 +395,19 @@ public sealed class PrintWorker
                                     $"wantedWin={PeekWantedPrinter(j)}");
                             }
                             LastClaimSummary =
-                                $"{envTag}: found={jobs.Count} · {jobs[0].Reference ?? jobs[0].Id.ToString()}";
+                                $"{envTag}: found={jobs.Count} · {diag.LastJobRef}";
                         }
 
                         foreach (var job in jobs)
-                            await ProcessJobAsync(api, conn.SupabaseUrl, envTag, job, ct);
+                            await ProcessJobAsync(api, conn, envTag, job, ct);
                     }
                     catch (Exception ex) when (ex is not OperationCanceledException)
                     {
                         conn.LastError = ex.Message;
+                        diag.LinkOk = false;
+                        diag.ClaimReason = ex.Message;
+                        diag.LastStage = PrintStage.Failed;
+                        diag.LastStageDetail = ex.Message;
                         SetStage(PrintStage.Failed, $"loop exception: {ex.Message}", envTag);
                         _log.Error($"[{envTag}] loop FAIL at stage={PrintStageLabels.En(LastStage)}: {ex.Message}");
                     }
@@ -395,19 +483,26 @@ public sealed class PrintWorker
 
     private async Task ProcessJobAsync(
         SupabaseBridgeApi api,
-        string connectionKey,
+        BridgeConnection conn,
         string envTag,
         ClaimedJob job,
         CancellationToken ct)
     {
+        var connectionKey = conn.SupabaseUrl;
+        var diag = GetConnDiag(conn);
         var refId = job.Reference ?? job.Id.ToString();
+        diag.LastJobRef = refId;
         SetActivity(BridgeActivity.ProcessingJob);
         SetStage(PrintStage.JobStart, $"ref={refId} jobId={job.Id}", envTag);
+        diag.LastStage = PrintStage.JobStart;
 
         // BP-12: never auto-print past TTL
         if (job.ExpiresAt is { } exp && exp < DateTimeOffset.UtcNow)
         {
             SetStage(PrintStage.TtlExpired, $"ref={refId} expiredAt={exp:O}", envTag);
+            diag.LastPrintOk = false;
+            diag.PrintReason = "TTL expired — job ignored";
+            diag.LastStage = PrintStage.TtlExpired;
             try
             {
                 await api.ReportAsync(job.Id, false, "TTL_EXPIRED", "Job expired before print", "transport_ack", ct);
@@ -429,10 +524,14 @@ public sealed class PrintWorker
             SetStage(PrintStage.RenderStart, $"ref={refId}", envTag);
             bytes = EscPosRenderer.Render(job);
             SetStage(PrintStage.RenderOk, $"ref={refId} bytes={bytes.Length}", envTag);
+            diag.LastStage = PrintStage.RenderOk;
         }
         catch (Exception ex)
         {
             SetStage(PrintStage.Failed, $"render failed ref={refId}: {ex.Message}", envTag);
+            diag.LastPrintOk = false;
+            diag.PrintReason = $"Render failed: {ex.Message}";
+            diag.LastStage = PrintStage.Failed;
             await ReportFailAsync(api, connectionKey, job, "RENDER_FAILED", ex.Message, ct, envTag);
             PrintFinished?.Invoke(false, $"{refId} · stopped_at=render · {ex.Message}");
             return;
@@ -444,14 +543,24 @@ public sealed class PrintWorker
         {
             wanted = PeekWantedPrinter(job);
             printerName = ResolvePrinterName(job);
+            var matchNote = string.IsNullOrWhiteSpace(wanted)
+                ? "no wanted name — fallback resolve"
+                : string.Equals(wanted, printerName, StringComparison.OrdinalIgnoreCase)
+                    ? "exact match"
+                    : $"rematched '{wanted}' → '{printerName}'";
             SetStage(
                 PrintStage.PrinterResolve,
-                $"ref={refId} wanted='{wanted ?? "(null)"}' resolved='{printerName}' copies={job.Printer?.DefaultCopies ?? 1}",
+                $"ref={refId} wanted='{wanted ?? "(null)"}' resolved='{printerName}' ({matchNote}) copies={job.Printer?.DefaultCopies ?? 1}",
                 envTag);
+            diag.LastStage = PrintStage.PrinterResolve;
+            diag.LastStageDetail = matchNote;
         }
         catch (Exception ex)
         {
             SetStage(PrintStage.Failed, $"printer resolve failed ref={refId}: {ex.Message}", envTag);
+            diag.LastPrintOk = false;
+            diag.PrintReason = $"Printer not matched: {ex.Message}";
+            diag.LastStage = PrintStage.Failed;
             await ReportFailAsync(api, connectionKey, job, "PRINTER_RESOLVE_FAILED", ex.Message, ct, envTag);
             PrintFinished?.Invoke(false, $"{refId} · stopped_at=printer_resolve · {ex.Message}");
             return;
@@ -469,6 +578,9 @@ public sealed class PrintWorker
         if (!spool.Ok)
         {
             SetStage(PrintStage.Failed, $"ref={refId} stopped_at={spool.Stage} · {spool.Detail}", envTag);
+            diag.LastPrintOk = false;
+            diag.PrintReason = $"{spool.Stage}: {spool.Detail}";
+            diag.LastStage = PrintStage.Failed;
             await ReportFailAsync(
                 api,
                 connectionKey,
@@ -482,6 +594,7 @@ public sealed class PrintWorker
         }
 
         SetStage(PrintStage.SpoolerOk, $"ref={refId} {spool.Detail}", envTag);
+        diag.LastStage = PrintStage.SpoolerOk;
 
         // BP-13: only mark success after spooler accepted full byte write — not paper-out proof.
         SetActivity(BridgeActivity.Reporting);
@@ -491,6 +604,9 @@ public sealed class PrintWorker
             await api.ReportAsync(job.Id, true, null, null, delivery, ct);
             SetStage(PrintStage.ReportSuccess, $"ref={refId} → {printerName} delivery={delivery}", envTag);
             SetStage(PrintStage.Done, $"ref={refId} pipeline complete", envTag);
+            diag.LastPrintOk = true;
+            diag.PrintReason = $"OK → {printerName}";
+            diag.LastStage = PrintStage.Done;
             PrintFinished?.Invoke(true, $"{refId} → {printerName}");
         }
         catch (Exception ex)
@@ -500,8 +616,47 @@ public sealed class PrintWorker
                 PrintStage.ReportFailure,
                 $"ref={refId} spooler OK but report failed (queued offline): {ex.Message}",
                 envTag);
-            // Paper may have printed — still surface success for operator with note.
+            diag.LastPrintOk = true;
+            diag.PrintReason = $"OK → {printerName} (report offline)";
+            diag.LastStage = PrintStage.ReportFailure;
             PrintFinished?.Invoke(true, $"{refId} → {printerName} · report_offline");
+        }
+    }
+
+    private static string SummarizeClaimDiag(string json, string envTag)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var pending = root.TryGetProperty("pending_jobs", out var pj) && pj.ValueKind == JsonValueKind.Array
+                ? pj.GetArrayLength()
+                : 0;
+            if (pending == 0)
+            {
+                return string.Equals(envTag, "testing", StringComparison.OrdinalIgnoreCase)
+                    ? "Session disabled or no pending jobs"
+                    : "No pending jobs in DB";
+            }
+
+            var reasons = new List<string>();
+            foreach (var j in root.GetProperty("pending_jobs").EnumerateArray())
+            {
+                if (j.TryGetProperty("reject_reason", out var rr))
+                {
+                    var r = rr.GetString();
+                    if (!string.IsNullOrWhiteSpace(r) && r != "CLAIMABLE")
+                        reasons.Add(r!);
+                }
+            }
+
+            if (reasons.Count > 0)
+                return $"pending={pending} blocked: {string.Join(", ", reasons.Distinct().Take(3))}";
+            return $"pending={pending} (claimable but not returned — check bridge_id binding)";
+        }
+        catch
+        {
+            return json.Length > 120 ? json[..120] + "…" : json;
         }
     }
 

@@ -17,6 +17,8 @@ public sealed class BridgeConnection
     public string? PrintCenterUrl { get; set; }
     public DateTimeOffset? LastHeartbeatAt { get; set; }
     public string? LastError { get; set; }
+    /// <summary>Preferred connection for legacy summary fields (optional).</summary>
+    public bool IsDefault { get; set; }
 
     [JsonIgnore]
     public bool IsPaired =>
@@ -84,12 +86,19 @@ public sealed class BridgeConfig
     public BridgeConnection? FindByUrl(string? url) =>
         Connections.FirstOrDefault(c => BridgeConnection.UrlsMatch(c.SupabaseUrl, url));
 
-    /// <summary>Prefer Production for legacy summary fields; else first paired.</summary>
+    /// <summary>Prefer explicit default, then Production, else first paired.</summary>
     public BridgeConnection? PrimaryConnection() =>
-        PairedConnections().FirstOrDefault(c =>
+        PairedConnections().FirstOrDefault(c => c.IsDefault)
+        ?? PairedConnections().FirstOrDefault(c =>
             string.Equals(c.Env, "production", StringComparison.OrdinalIgnoreCase))
         ?? PairedConnections().FirstOrDefault()
         ?? Connections.FirstOrDefault();
+
+    public BridgeConnection? FindById(string? id) =>
+        string.IsNullOrWhiteSpace(id)
+            ? null
+            : Connections.FirstOrDefault(c =>
+                string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase));
 }
 
 public sealed class ClaimedJob

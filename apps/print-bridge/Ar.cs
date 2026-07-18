@@ -51,12 +51,34 @@ public static class Ar
 
     public const string DeviceName = "اسم الجهاز";
     public const string Restaurant = "الاتصالات";
+    public const string RestaurantName = "المطعم";
     public const string ConnectionsTitle = "الاتصالات";
     public const string EnvProduction = "إنتاج";
     public const string EnvTesting = "اختبار";
     public const string EnvUnknown = "بيئة";
     public const string ConnOnline = "متصل";
     public const string ConnOffline = "غير متصل";
+
+    public const string ManageConnections = "إدارة الاتصالات";
+    public const string ManageConnectionsHint =
+        "الاتصال الناجح لا يعني أن الطباعة تعمل — راجع Claim والسبب أسفل كل بيئة.";
+    public const string NoConnections = "لا توجد اتصالات محفوظة. اربط بيئة من زر «ربط بيئة».";
+    public const string Reconnect = "إعادة الاتصال";
+    public const string DeleteConnection = "حذف الاتصال";
+    public const string SetDefault = "تعيين كافتراضي";
+    public const string DefaultBadge = "افتراضي";
+    public const string DeleteConnectionConfirmFmt =
+        "حذف اتصال «{0}» من هذا الجهاز؟ ستحتاج إلى الربط مرة أخرى لهذه البيئة.";
+    public const string ResetConnections = "إعادة ضبط الاتصالات";
+    public const string ResetConnectionsConfirm =
+        "سيتم حذف جميع الاتصالات المحفوظة، وستحتاج إلى ربط البيئات مرة أخرى.\n\n" +
+        "لن تُحذف إعدادات الجهاز أو الطابعات أو مسار التثبيت.\n\nمتابعة؟";
+    public const string ResetConnectionsDone = "تم حذف الاتصالات. اربط البيئات من جديد.";
+    public const string ConnLastPoll = "آخر استطلاع";
+    public const string ConnClaimFmt = "Claim: {0} مهمة";
+    public const string ConnClaimZero = "Claim: 0";
+    public const string ConnPrint = "Print";
+    public const string ConnPipeline = "المسار";
     public const string Printers = "الطابعات";
     public const string NoPrinters = "لا توجد طابعات مثبتة على هذا الجهاز";
     public const string TestPrint = "اختبار محلي (تشخيص)";

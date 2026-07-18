@@ -23,7 +23,7 @@ public static class DiagnosticsReport
         sb.AppendLine();
 
         sb.AppendLine("Connections:");
-        var conns = cfg.PairedConnections()
+        var conns = cfg.Connections
             .OrderBy(c =>
                 string.Equals(c.Env, "production", StringComparison.OrdinalIgnoreCase) ? 0 :
                 string.Equals(c.Env, "testing", StringComparison.OrdinalIgnoreCase) ? 1 : 2)
@@ -36,8 +36,10 @@ public static class DiagnosticsReport
         {
             foreach (var c in conns)
             {
-                var online = c.LastHeartbeatAt is { } hb &&
-                    (DateTimeOffset.Now - hb).TotalSeconds < 60 &&
+                var d = worker.GetConnDiag(c);
+                var online = d.LinkOk &&
+                    c.LastHeartbeatAt is { } hb &&
+                    (DateTimeOffset.Now - hb).TotalSeconds < 90 &&
                     string.IsNullOrWhiteSpace(c.LastError);
                 var mark = online ? "✓" : "✗";
                 var env = c.Env switch
@@ -47,14 +49,18 @@ public static class DiagnosticsReport
                     _ => c.Env ?? "unknown",
                 };
                 var name = string.IsNullOrWhiteSpace(c.RestaurantName) ? "" : $" ({c.RestaurantName})";
-                var hbText = c.LastHeartbeatAt is { } t
-                    ? t.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss")
+                var poll = d.LastPollAt is { } t
+                    ? t.ToLocalTime().ToString("HH:mm:ss")
                     : "-";
-                sb.AppendLine($"- {env}{name} {mark}  lastHb={hbText}");
-                if (!string.IsNullOrWhiteSpace(c.LastError))
-                    sb.AppendLine($"  error: {c.LastError}");
+                sb.AppendLine($"- {env}{name} {mark}{(c.IsDefault ? " [default]" : "")}");
+                sb.AppendLine($"  Last Poll: {poll}");
+                sb.AppendLine($"  Claim: {d.LastClaimCount} · {d.ClaimReason ?? "-"}");
+                sb.AppendLine($"  Print: {(d.LastPrintOk == true ? "OK" : d.LastPrintOk == false ? "Failed" : "-")} · {d.PrintReason ?? "-"}");
+                sb.AppendLine($"  Pipeline: {d.PipelineSummary}");
                 if (!string.IsNullOrWhiteSpace(c.BridgeId))
                     sb.AppendLine($"  bridgeId: {c.BridgeId}");
+                if (!string.IsNullOrWhiteSpace(c.LastError))
+                    sb.AppendLine($"  error: {c.LastError}");
             }
         }
 

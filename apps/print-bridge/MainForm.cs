@@ -62,7 +62,7 @@ public sealed class MainForm : Form
 
         var statusCard = NihaTheme.Card();
         statusCard.Dock = DockStyle.Top;
-        statusCard.Height = 300;
+        statusCard.Height = 340;
         statusCard.Padding = new Padding(16);
         PaintBorder(statusCard);
 
@@ -72,6 +72,8 @@ public sealed class MainForm : Form
         _pairStatus = Row(statusCard, Ar.Paired, Ar.NotPaired, 148);
         _device = Row(statusCard, Ar.DeviceName, Environment.MachineName, 180);
         _restaurant = Row(statusCard, Ar.ConnectionsTitle, FormatEnvironments(), 212, multiline: true);
+        // Taller value so Claim/Reason lines fit per env
+        _restaurant.Height = 96;
 
         var printersCard = NihaTheme.Card();
         printersCard.Dock = DockStyle.Top;
@@ -139,7 +141,7 @@ public sealed class MainForm : Form
         var actions = new FlowLayoutPanel
         {
             Dock = DockStyle.Top,
-            Height = 52,
+            Height = 96,
             FlowDirection = FlowDirection.RightToLeft,
             WrapContents = true,
             Padding = new Padding(0, 8, 0, 0),
@@ -154,12 +156,17 @@ public sealed class MainForm : Form
         rePair.Width = 130;
         rePair.Click += (_, _) => RequestRePair();
 
+        var manageConn = NihaTheme.OutlineButton(Ar.ManageConnections);
+        manageConn.Width = 140;
+        manageConn.Click += (_, _) => ShowConnections();
+
         var about = NihaTheme.OutlineButton(Ar.About);
         about.Width = 120;
         about.Click += (_, _) => ShowAbout();
 
         actions.Controls.Add(openPc);
         actions.Controls.Add(rePair);
+        actions.Controls.Add(manageConn);
         actions.Controls.Add(about);
 
         var adminHint = new Label
@@ -585,6 +592,21 @@ public sealed class MainForm : Form
         form.ShowDialog(this);
     }
 
+    public void ShowConnections()
+    {
+        using var form = new ConnectionsForm(_cfg, _worker, () => RePairRequested?.Invoke());
+        form.ConnectionsChanged += () =>
+        {
+            RefreshStatus(_lastLinkState);
+            RefreshActivity();
+        };
+        form.ShowDialog(this);
+        RefreshStatus(
+            _cfg.PairedConnections().Any()
+                ? BridgeLinkState.Connected
+                : BridgeLinkState.NotPaired);
+    }
+
     public void RefreshStatus(BridgeLinkState state)
     {
         _lastLinkState = state;
@@ -642,15 +664,22 @@ public sealed class MainForm : Form
                     "testing" => Ar.EnvTesting,
                     _ => Ar.EnvUnknown,
                 };
-                var online = c.LastHeartbeatAt is { } hb &&
-                    (DateTimeOffset.Now - hb).TotalSeconds < 60 &&
+                var diag = _worker.GetConnDiag(c);
+                var online = diag.LinkOk &&
+                    c.LastHeartbeatAt is { } hb &&
+                    (DateTimeOffset.Now - hb).TotalSeconds < 90 &&
                     string.IsNullOrWhiteSpace(c.LastError);
                 var mark = online ? "[ON]" : "[OFF]";
-                var status = online ? Ar.ConnOnline : Ar.ConnOffline;
                 var name = string.IsNullOrWhiteSpace(c.RestaurantName)
                     ? ""
                     : $" — {c.RestaurantName}";
-                return $"{mark} {env}{name} ({status})";
+                var claim = diag.LastClaimCount > 0
+                    ? $"Claim:{diag.LastClaimCount}"
+                    : "Claim:0";
+                var reason = diag.LastClaimCount == 0 && !string.IsNullOrWhiteSpace(diag.ClaimReason)
+                    ? diag.ClaimReason
+                    : diag.PrintReason ?? diag.PipelineSummary;
+                return $"{mark} {env}{name} · {claim} · {reason}";
             })
             .ToList();
         if (parts.Count == 0) return Ar.None;
