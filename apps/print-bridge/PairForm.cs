@@ -393,7 +393,7 @@ public sealed class PairForm : Form
         try
         {
             var api = new SupabaseBridgeApi(conn);
-            var version = typeof(PairForm).Assembly.GetName().Version?.ToString(3) ?? "0.5.6";
+            var version = typeof(PairForm).Assembly.GetName().Version?.ToString(3) ?? "0.5.7";
             var result = await api.PairAsync(
                 parsed.Code,
                 Environment.MachineName,
