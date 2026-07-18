@@ -23,10 +23,7 @@ import { OpenShiftDialog } from '@/features/treasury/components/dialogs/OpenShif
 import { CloseShiftDialog } from '@/features/treasury/components/dialogs/CloseShiftDialog'
 import { OrderDetailDialog } from '@/features/orders/components/OrderDetailDialog'
 import { ReprintDocumentsDialog } from '@/features/orders/components/ReprintDocumentsDialog'
-import {
-  PaymentBreakdownBadges,
-  PaymentMethodTotalsStrip,
-} from '@/features/orders/components/PaymentBreakdownBadges'
+import { PaymentMethodTotalsStrip } from '@/features/orders/components/PaymentBreakdownBadges'
 import { fetchOrdersForPos } from '@/features/orders/api/orders.api'
 import { CreateOrderDialog } from '@/features/pos/components/CreateOrderDialog'
 import { PosSearchResults } from '@/features/pos/components/PosSearchResults'
@@ -87,8 +84,8 @@ const FILTERS: HubFilter[] = [...PRIMARY_FILTERS, ...SECONDARY_FILTERS]
 /** Manager-only archive tab — cancelled stay out of cashier active queues. */
 const MANAGER_ONLY_FILTERS: HubFilter[] = ['cancelled']
 
-/** Cards per page — fits viewport without scrolling the hub grid. */
-const PAGE_SIZE = 6
+/** Cards per page — compact grid fits ~10 without scrolling the hub. */
+const PAGE_SIZE = 10
 
 function orderAmounts(order: OrderListItem) {
   const total = order.order_total ?? order.total
@@ -802,12 +799,12 @@ export function PosPage() {
               held.length === 0 ? (
                 <EmptyState text={t.pos.hold.empty} />
               ) : (
-                <div className="grid h-full content-start gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid h-full content-start gap-1.5 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
                   {(pageItems as PosDraft[]).map((h) => (
                     <button
                       key={h.id}
                       type="button"
-                      className="rounded-2xl border border-[#e8ecf2] bg-white p-3 text-right shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)]"
+                      className="rounded-xl border border-[#e8ecf2] bg-white p-2 text-right shadow-[0_1px_8px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.08)]"
                       onClick={() => {
                         setHeld((prev) => prev.filter((x) => x.id !== h.id))
                         setActiveDraft({ ...h, heldAt: null })
@@ -815,13 +812,13 @@ export function PosPage() {
                         toast.message(t.pos.hold.resumed)
                       }}
                     >
-                      <p className="font-bold" dir="ltr">
+                      <p className="text-sm font-bold" dir="ltr">
                         {h.localRef}
                       </p>
-                      <p className="text-sm">
+                      <p className="truncate text-xs">
                         {h.customerName || t.pos.create.walkin}
                       </p>
-                      <p className="mt-1 text-xs text-[#64748b]">
+                      <p className="mt-0.5 text-[11px] text-[#64748b]">
                         {h.lines.reduce((s, l) => s + l.quantity, 0)}{' '}
                         {t.pos.hub.items} ·{' '}
                         {formatMoney(
@@ -831,7 +828,7 @@ export function PosPage() {
                           ),
                         )}
                       </p>
-                      <span className="mt-2 inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-[#22c55e] text-sm font-semibold text-white">
+                      <span className="mt-1.5 inline-flex min-h-8 w-full items-center justify-center rounded-lg bg-[#22c55e] text-xs font-semibold text-white">
                         {t.pos.hold.resume}
                       </span>
                     </button>
@@ -843,54 +840,54 @@ export function PosPage() {
             ) : orders.length === 0 ? (
               <EmptyState text={t.orders.hub.empty} />
             ) : (
-              <div className="grid h-full content-start gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid h-full content-start gap-1.5 grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
                 {(pageItems as OrderListItem[]).map((o) => {
-                  const { total, collected, remaining } = orderAmounts(o)
+                  const { total, remaining } = orderAmounts(o)
                   const chrome = cardChrome(o)
                   return (
                     <div
                       key={o.id}
                       className={cn(
-                        'overflow-hidden rounded-2xl border-2 bg-white shadow-[0_2px_12px_rgba(15,23,42,0.05)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_24px_rgba(15,23,42,0.1)]',
+                        'overflow-hidden rounded-xl border bg-white shadow-[0_1px_8px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.08)]',
                         chrome.border,
                       )}
                     >
                       <div
                         className={cn(
-                          'flex items-center justify-between px-3 py-1.5 text-xs font-bold',
+                          'flex items-center justify-between px-1.5 py-0.5 text-[10px] font-bold',
                           chrome.header,
                         )}
                       >
-                        <span>{chrome.label}</span>
-                        <span className="font-medium opacity-80">
+                        <span className="truncate">{chrome.label}</span>
+                        <span className="shrink-0 font-medium opacity-80">
                           {new Date(o.created_at).toLocaleTimeString('ar-EG', {
                             hour: '2-digit',
                             minute: '2-digit',
                           })}
                         </span>
                       </div>
-                      <div className="p-3 text-right">
+                      <div className="p-1.5 text-right">
                       <button
                         type="button"
                         className="w-full text-right"
                         onClick={() => setDetailId(o.id)}
                       >
-                        <div className="mb-2">
+                        <div className="mb-0.5 flex items-baseline justify-between gap-1">
                           <p
-                            className="text-base font-bold text-[#0f172a]"
+                            className="text-[13px] font-bold leading-tight text-[#0f172a]"
                             dir="ltr"
                           >
                             {o.reference}
                           </p>
-                          <p className="text-sm text-[#334155]">
+                          <p className="truncate text-[11px] text-[#334155]">
                             {o.customer_name || t.pos.create.walkin}
                           </p>
                         </div>
 
-                        <div className="mb-2 flex flex-wrap gap-1.5">
+                        <div className="mb-0.5 flex flex-wrap gap-0.5">
                           <span
                             className={cn(
-                              'rounded-lg border px-2 py-1 text-xs font-semibold',
+                              'rounded border px-1 py-px text-[9px] font-semibold',
                               paymentBadge(o.payment_status),
                             )}
                           >
@@ -898,35 +895,29 @@ export function PosPage() {
                           </span>
                           <span
                             className={cn(
-                              'rounded-lg border px-2 py-1 text-xs font-semibold',
+                              'rounded border px-1 py-px text-[9px] font-semibold',
                               typeBadge(o.order_type),
                             )}
                           >
                             {typeLabel(o.order_type)}
                           </span>
                           {o.fulfillment_status === 'ready' ? (
-                            <span className="rounded-lg border border-[#86efac] bg-[#dcfce7] px-2 py-1 text-xs font-semibold text-[#15803d]">
+                            <span className="rounded border border-[#86efac] bg-[#dcfce7] px-1 py-px text-[9px] font-semibold text-[#15803d]">
                               {t.orders.hub.filters.ready}
                             </span>
                           ) : null}
                         </div>
 
-                        <div className="mb-2 grid grid-cols-2 gap-1.5 text-xs text-[#64748b]">
-                          <span className="rounded-lg bg-[#f8fafc] px-2 py-1.5 text-end">
+                        <div className="mb-0.5 flex items-center justify-between gap-1 text-[10px] text-[#64748b]">
+                          <span>
                             {t.orders.money.total}{' '}
                             <strong className="text-[#0f172a]" dir="ltr">
                               {formatMoney(total)}
                             </strong>
                           </span>
-                          <span className="rounded-lg bg-[#f8fafc] px-2 py-1.5">
-                            {t.orders.money.collected}{' '}
-                            <strong className="text-[#0f172a]" dir="ltr">
-                              {formatMoney(collected)}
-                            </strong>
-                          </span>
                           <span
                             className={cn(
-                              'col-span-2 rounded-lg px-2 py-1.5 text-end font-semibold',
+                              'rounded px-1 py-0.5 font-semibold',
                               remaining > 0.001
                                 ? 'bg-[#dcfce7] text-[#15803d]'
                                 : 'bg-[#f8fafc]',
@@ -936,44 +927,37 @@ export function PosPage() {
                             <strong dir="ltr">{formatMoney(remaining)}</strong>
                           </span>
                         </div>
-
-                        <div className="mb-1">
-                          <PaymentBreakdownBadges
-                            rows={o.payment_breakdown}
-                            compact
-                          />
-                        </div>
                       </button>
 
-                      <div className="flex gap-1.5 border-t border-[#eef2f7] pt-2">
+                      <div className="flex gap-0.5 border-t border-[#eef2f7] pt-1">
                         <button
                           type="button"
-                          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-[#eff6ff] text-xs font-semibold text-[#2563eb]"
+                          className="inline-flex min-h-7 flex-1 items-center justify-center gap-0.5 rounded-md bg-[#eff6ff] text-[10px] font-semibold text-[#2563eb]"
                           onClick={() => setDetailId(o.id)}
                         >
-                          <FileText className="size-4" />
+                          <FileText className="size-3" />
                           {t.orders.hub.summary}
                         </button>
                         {remaining > 0.001 ? (
                           <button
                             type="button"
-                            className="inline-flex min-h-11 flex-1 flex-col items-center justify-center rounded-xl bg-[#22c55e] px-2 text-white shadow-[0_4px_12px_rgba(34,197,94,0.3)]"
+                            className="inline-flex min-h-7 flex-1 flex-col items-center justify-center rounded-md bg-[#22c55e] px-0.5 text-white"
                             onClick={() => setDetailId(o.id)}
                           >
-                            <span className="text-xs font-bold">
+                            <span className="text-[9px] font-bold leading-none">
                               {t.pos.hub.collectNow}
                             </span>
-                            <span className="text-[11px] font-semibold" dir="ltr">
+                            <span className="text-[9px] font-semibold leading-none" dir="ltr">
                               {formatMoney(remaining)}
                             </span>
                           </button>
                         ) : null}
                         <button
                           type="button"
-                          className="inline-flex min-h-11 flex-1 items-center justify-center gap-1 rounded-xl bg-[#f8fafc] text-xs font-semibold text-[#475569]"
+                          className="inline-flex min-h-7 flex-1 items-center justify-center gap-0.5 rounded-md bg-[#f8fafc] text-[10px] font-semibold text-[#475569]"
                           onClick={() => setReprintId(o.id)}
                         >
-                          <Printer className="size-4" />
+                          <Printer className="size-3" />
                           {t.pos.hub.printShort}
                         </button>
                       </div>

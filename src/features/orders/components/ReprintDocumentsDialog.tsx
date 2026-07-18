@@ -11,11 +11,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/shared/components/ui/dialog'
-import { Input } from '@/shared/components/ui/input'
-import { Label } from '@/shared/components/ui/label'
 import { t } from '@/shared/i18n'
 
 export type ReprintDocumentChoice = 'receipt' | 'kitchen' | 'both'
+
+/** Server still requires a non-empty reason — cashiers no longer type it. */
+const DEFAULT_REPRINT_REASON = 'إعادة طباعة من نقطة البيع'
 
 type Props = {
   orderId: string | null
@@ -31,32 +32,25 @@ export function ReprintDocumentsDialog({
   onDone,
 }: Props) {
   const [choice, setChoice] = useState<ReprintDocumentChoice>('receipt')
-  const [reason, setReason] = useState('')
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) return
     setChoice('receipt')
-    setReason('')
     setError(null)
     setPending(false)
   }, [open])
 
   async function submit() {
     if (!orderId) return
-    const trimmed = reason.trim()
-    if (!trimmed) {
-      setError(t.orders.errors.REASON_REQUIRED)
-      return
-    }
     setPending(true)
     setError(null)
     try {
       const kinds: Array<'receipt' | 'kitchen'> =
         choice === 'both' ? ['receipt', 'kitchen'] : [choice]
       for (const kind of kinds) {
-        await reprintOrder(orderId, trimmed, kind)
+        await reprintOrder(orderId, DEFAULT_REPRINT_REASON, kind)
       }
       toast.success(t.orders.hub.reprintDone)
       onOpenChange(false)
@@ -112,18 +106,6 @@ export function ReprintDocumentsDialog({
               </label>
             ))}
           </fieldset>
-
-          <div className="space-y-2">
-            <Label htmlFor="reprint-reason" required>
-              {t.orders.hub.reprintReason}
-            </Label>
-            <Input
-              id="reprint-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              placeholder={t.orders.hub.reprintReasonPlaceholder}
-            />
-          </div>
         </div>
 
         <DialogFooter>

@@ -10,7 +10,7 @@ export const orders = {
     timeline: 'سجل الطلب',
     reprint: 'إعادة طباعة',
     reprintTitle: 'إعادة طباعة مستند',
-    reprintHint: 'اختر نوع المستند ثم أدخل سبب الإعادة (يُسجَّل في السجل والتدقيق).',
+    reprintHint: 'اختر نوع المستند ثم أرسل للطباعة.',
     reprintDocument: 'نوع المستند',
     reprintReceipt: 'إيصال العميل',
     reprintKitchen: 'ورقة المطبخ',
