@@ -5,7 +5,7 @@ import { Button } from '@/shared/components/ui/button'
 import { Input } from '@/shared/components/ui/input'
 import {
   collectRemaining,
-  reverseCollection,
+  rejectCollection,
 } from '@/features/orders/api/orders.api'
 import type { OrderCollection, OrderMoney } from '@/features/orders/types'
 import { formatMoney } from '@/features/treasury/utils/format'
@@ -39,7 +39,7 @@ export function FinancialAdjustPanel({
   const cashPm = paymentMethods.find((p) => p.code === 'cash') ?? paymentMethods[0]
 
   const reverseMut = useMutation({
-    mutationFn: () => reverseCollection(reverseId!, reverseReason.trim()),
+    mutationFn: () => rejectCollection(reverseId!, reverseReason.trim()),
     onSuccess: () => {
       toast.success(t.orders.financial.reversed)
       setReverseId(null)

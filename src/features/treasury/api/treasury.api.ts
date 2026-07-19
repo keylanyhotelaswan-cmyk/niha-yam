@@ -19,6 +19,12 @@ type ErrorCode = keyof typeof t.treasury.errors
 
 /** RPC errors surface the code inside the message; map to Arabic copy. */
 function rpcErrorMessage(message: string): string {
+  if (
+    message.includes('shift_handovers_restaurant_id_reference') ||
+    (message.includes('duplicate key') && message.includes('shift_handovers'))
+  ) {
+    return t.treasury.errors.HANDOVER_REF_COLLISION
+  }
   const code = (Object.keys(t.treasury.errors) as ErrorCode[]).find(
     (c) => c !== 'generic' && message.includes(c),
   )

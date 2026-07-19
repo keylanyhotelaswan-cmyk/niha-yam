@@ -195,11 +195,11 @@ export const orders = {
   },
   financial: {
     title: 'تعديل مالي',
-    hint: 'مسار append-only: رفض/عكس تحصيل أو تحصيل المتبقي — بدون تعديل أصناف.',
-    reverse: 'رفض / عكس تحصيل',
-    reverseAction: 'عكس',
-    reverseReason: 'سبب العكس',
-    reversed: 'تم عكس التحصيل.',
+    hint: 'المدير يراجع التحصيل؛ عند الخطأ استخدم رفض لإنشاء حركة عكسية مع الاحتفاظ بالسجل.',
+    reverse: 'رفض تحصيل (عكس أثر)',
+    reverseAction: 'رفض',
+    reverseReason: 'سبب الرفض',
+    reversed: 'تم رفض التحصيل وعكس أثره.',
     overCollected: 'زيادة محصّلة',
   },
   fulfillment: {

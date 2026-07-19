@@ -359,6 +359,8 @@ export const treasury = {
     HANDOVER_PENDING: 'يوجد تسليم عهدة معلّق — أكمل الاستلام أو الرفض أولًا.',
     HANDOVER_ALREADY_PENDING: 'يوجد تسليم معلّق لهذه الوردية بالفعل.',
     HANDOVER_ALREADY_EXECUTED: 'تم تنفيذ تسليم هذه الوردية مسبقًا.',
+    HANDOVER_REF_COLLISION:
+      'تعذّر إنشاء رقم تسليم فريد. حدّث الصفحة وأعد محاولة إغلاق الوردية.',
     PENDING_NEXT_HANDOVER: 'يجب استلام عهدة الوردية السابقة قبل فتح وردية جديدة.',
     RECEIVE_COUNT_REQUIRED: 'عدّ النقد المستلم مطلوب قبل فتح الوردية.',
     REMOTE_OPERATOR_NO_CASH: 'مشغّل عن بُعد لا يمكنه تنفيذ عمليات نقدية.',
