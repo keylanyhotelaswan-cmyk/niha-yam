@@ -10,9 +10,6 @@ import {
   DialogTitle,
 } from '@/shared/components/ui/dialog'
 import {
-  approveCollection,
-  approveExpense,
-  approvePendingForShift,
   fetchPendingCollections,
   fetchPendingExpenses,
   parsePendingExpensesSummary,
@@ -86,21 +83,6 @@ export function CollectionApprovalDialog({ open, onOpenChange, shift }: Props) {
     void pendingExpensesQuery.refetch()
   }
 
-  const approveAllMut = useMutation({
-    mutationFn: () => approvePendingForShift(shiftId),
-    onSuccess: (result) => {
-      toast.success(
-        t.orders.approval.approvedAll(
-          result.approved_count,
-          result.approved_expenses_count,
-        ),
-      )
-      refresh()
-      onOpenChange(false)
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
-
   const rejectAllMut = useMutation({
     mutationFn: (reason: string) => rejectPendingForShift(shiftId, reason),
     onSuccess: (result) => {
@@ -114,24 +96,6 @@ export function CollectionApprovalDialog({ open, onOpenChange, shift }: Props) {
       setRejectReason('')
       refresh()
       onOpenChange(false)
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
-
-  const approveOneMut = useMutation({
-    mutationFn: approveCollection,
-    onSuccess: () => {
-      toast.success(t.orders.approval.approveOne)
-      refresh()
-    },
-    onError: (e: Error) => toast.error(e.message),
-  })
-
-  const approveExpenseMut = useMutation({
-    mutationFn: approveExpense,
-    onSuccess: () => {
-      toast.success(t.orders.approval.approveOne)
-      refresh()
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -326,14 +290,6 @@ export function CollectionApprovalDialog({ open, onOpenChange, shift }: Props) {
                     <div className="space-y-2">
                       <Button
                         type="button"
-                        className="w-full"
-                        disabled={approveAllMut.isPending || !shiftId}
-                        onClick={() => approveAllMut.mutate()}
-                      >
-                        {t.orders.approval.approveAll}
-                      </Button>
-                      <Button
-                        type="button"
                         variant="outline"
                         className="w-full"
                         onClick={() => setView('exceptions')}
@@ -389,14 +345,6 @@ export function CollectionApprovalDialog({ open, onOpenChange, shift }: Props) {
                               <Button
                                 type="button"
                                 size="sm"
-                                disabled={approveOneMut.isPending}
-                                onClick={() => approveOneMut.mutate(row.id)}
-                              >
-                                {t.orders.approval.approveOne}
-                              </Button>
-                              <Button
-                                type="button"
-                                size="sm"
                                 variant="outline"
                                 onClick={() =>
                                   setRejectTarget({
@@ -445,16 +393,6 @@ export function CollectionApprovalDialog({ open, onOpenChange, shift }: Props) {
                               ) : null}
                             </div>
                             <div className="flex gap-1">
-                              <Button
-                                type="button"
-                                size="sm"
-                                disabled={approveExpenseMut.isPending}
-                                onClick={() =>
-                                  approveExpenseMut.mutate(row.id)
-                                }
-                              >
-                                {t.orders.approval.approveOne}
-                              </Button>
                               <Button
                                 type="button"
                                 size="sm"

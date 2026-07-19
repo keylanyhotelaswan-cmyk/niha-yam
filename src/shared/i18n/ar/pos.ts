@@ -90,7 +90,7 @@ export const pos = {
     expensesHeading: 'مصروفات الوردية',
     expensesTotal: 'إجمالي المصروفات',
     expensesPending: 'مصروفات معلّقة',
-    expensesApproved: 'مصروفات معتمدة',
+    expensesApproved: 'مصروفات منفّذة',
     expensesEmpty: 'لا مصروفات في هذه الوردية.',
     expensesViewDetails: 'عرض التفاصيل',
     reasonRequired: 'اختر سبب التحويل.',

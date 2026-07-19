@@ -4,11 +4,7 @@ import { LifecycleActions } from '@/features/treasury/components/LifecycleAction
 import { StatusBadge } from '@/features/treasury/components/StatusBadge'
 import { AdjustmentDialog } from '@/features/treasury/components/dialogs/AdjustmentDialog'
 import { ReasonDialog } from '@/features/treasury/components/dialogs/ReasonDialog'
-import {
-  useApproveAdjustment,
-  useRejectAdjustment,
-  useReverseAdjustment,
-} from '@/features/treasury/hooks/useTreasuryMutations'
+import { useRejectAdjustment } from '@/features/treasury/hooks/useTreasuryMutations'
 import { formatDateTime, formatMoney } from '@/features/treasury/utils/format'
 import type { AdjustmentRow, TreasuryRow } from '@/features/treasury/types'
 import { Button } from '@/shared/components/ui/button'
@@ -29,49 +25,33 @@ import {
 import { t } from '@/shared/i18n'
 
 type Props = { adjustments: AdjustmentRow[]; treasuries: TreasuryRow[] }
-type ReasonState = { action: 'reject' | 'reverse'; id: string } | null
 type CreateState = { kind: 'deposit' | 'withdrawal' } | null
 
 export function AdjustmentsTab({ adjustments, treasuries }: Props) {
   const [create, setCreate] = useState<CreateState>(null)
-  const [reason, setReason] = useState<ReasonState>(null)
+  const [rejectId, setRejectId] = useState<string | null>(null)
   const [reasonError, setReasonError] = useState<string | null>(null)
 
-  const approve = useApproveAdjustment()
   const reject = useRejectAdjustment()
-  const reverse = useReverseAdjustment()
 
   const name = useMemo(() => {
     const map = new Map(treasuries.map((tr) => [tr.id, tr.name]))
     return (id: string) => map.get(id) ?? t.treasury.common.none
   }, [treasuries])
 
-  function onApprove(id: string) {
-    approve.mutate(id, {
-      onSuccess: () => toast.success(t.treasury.lifecycle.approved),
-      onError: (e: Error) => toast.error(e.message),
-    })
-  }
-
   function onConfirmReason(text: string) {
-    if (!reason) return
+    if (!rejectId) return
     setReasonError(null)
-    const opts = {
-      onSuccess: () => {
-        toast.success(
-          reason.action === 'reject'
-            ? t.treasury.lifecycle.rejected
-            : t.treasury.lifecycle.reversed,
-        )
-        setReason(null)
+    reject.mutate(
+      { id: rejectId, reason: text },
+      {
+        onSuccess: () => {
+          toast.success(t.treasury.lifecycle.rejected)
+          setRejectId(null)
+        },
+        onError: (e: Error) => setReasonError(e.message),
       },
-      onError: (e: Error) => setReasonError(e.message),
-    }
-    if (reason.action === 'reject') {
-      reject.mutate({ id: reason.id, reason: text }, opts)
-    } else {
-      reverse.mutate({ id: reason.id, reason: text }, opts)
-    }
+    )
   }
 
   return (
@@ -148,14 +128,9 @@ export function AdjustmentsTab({ adjustments, treasuries }: Props) {
                   <TableCell className="text-end">
                     <LifecycleActions
                       status={adj.status}
-                      onApprove={() => onApprove(adj.id)}
                       onReject={() => {
                         setReasonError(null)
-                        setReason({ action: 'reject', id: adj.id })
-                      }}
-                      onReverse={() => {
-                        setReasonError(null)
-                        setReason({ action: 'reverse', id: adj.id })
+                        setRejectId(adj.id)
                       }}
                     />
                   </TableCell>
@@ -175,27 +150,15 @@ export function AdjustmentsTab({ adjustments, treasuries }: Props) {
         />
       ) : null}
       <ReasonDialog
-        open={reason !== null}
-        title={
-          reason?.action === 'reject'
-            ? t.treasury.lifecycle.rejectTitle
-            : t.treasury.lifecycle.reverseTitle
-        }
-        hint={
-          reason?.action === 'reverse'
-            ? t.treasury.lifecycle.reverseHint
-            : undefined
-        }
-        confirmLabel={
-          reason?.action === 'reject'
-            ? t.treasury.lifecycle.reject
-            : t.treasury.lifecycle.reverse
-        }
+        open={rejectId !== null}
+        title={t.treasury.lifecycle.rejectTitle}
+        hint={t.treasury.lifecycle.rejectHint}
+        confirmLabel={t.treasury.lifecycle.reject}
         destructive
-        pending={reject.isPending || reverse.isPending}
+        pending={reject.isPending}
         submitError={reasonError}
         onConfirm={onConfirmReason}
-        onOpenChange={(next) => !next && setReason(null)}
+        onOpenChange={(next) => !next && setRejectId(null)}
       />
     </Card>
   )

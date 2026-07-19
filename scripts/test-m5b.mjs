@@ -197,22 +197,22 @@ async function main() {
 
   const { data: ctx1 } = await rpc('get_pos_context')
   const opDrawer = Number(ctx1?.operational_drawer_balance ?? 0)
+  // After auto-post, operational drawer = shift ledger (float + posted cash − expenses)
   record(
-    '04 operational drawer = approved ledger + pending cash',
+    '04 operational drawer = shift ledger (cash posted)',
     near(opDrawer, drawerAfterOpen + netCash),
-    `op=${opDrawer} expected=${drawerAfterOpen + netCash} (float ${drawerAfterOpen} + pending ${netCash})`,
+    `op=${opDrawer} expected=${drawerAfterOpen + netCash} (float ${drawerAfterOpen} + cash ${netCash})`,
   )
 
-  // Pending expense: coverage from operational drawer (not approved-only ledger)
-  // Use amount below pending cash so it works even if float open failed.
+  // Expense executes immediately and posts ledger
   let expenseAmt = 0
   const expenseAmtTarget = Math.min(10, Math.max(1, Math.floor(netCash / 2) || 1))
   const expId = await expectOk(
-    '04b pos_record_expense pending',
+    '04b pos_record_expense executed',
     rpc('pos_record_expense', {
       p_amount: expenseAmtTarget,
       p_category: 'petty_cash',
-      p_description: 'اختبار مصروف معلّق',
+      p_description: 'اختبار مصروف فوري',
       p_vendor: null,
     }),
   )
@@ -224,8 +224,8 @@ async function main() {
       .eq('id', expId)
       .single()
     record(
-      '04c expense stays pending (no ledger yet)',
-      expRow?.status === 'pending',
+      '04c expense executed on create',
+      expRow?.status === 'executed',
       expRow?.status,
     )
     const { data: expMoves } = await admin
@@ -233,14 +233,14 @@ async function main() {
       .select('id')
       .eq('source_ref_id', expId)
     record(
-      '04d no treasury movement until approve',
-      (expMoves ?? []).length === 0,
+      '04d treasury movement posted on create',
+      (expMoves ?? []).length >= 1,
       `moves=${expMoves?.length ?? 0}`,
     )
     const { data: ctxExp } = await rpc('get_pos_context')
     const opAfterExp = Number(ctxExp?.operational_drawer_balance ?? 0)
     record(
-      '04e operational drawer subtracts pending expense',
+      '04e operational drawer reflects executed expense',
       near(opAfterExp, drawerAfterOpen + netCash - expenseAmt),
       `op=${opAfterExp} expected=${drawerAfterOpen + netCash - expenseAmt}`,
     )
@@ -266,17 +266,16 @@ async function main() {
       .from('order_payments')
       .select('collection_status')
       .eq('order_id', sale.order_id)
-    const allPending = (pays ?? []).every((p) => p.collection_status === 'pending')
-    record('05 payments pending', allPending, `${pays?.length ?? 0} rows`)
+    const allApproved = (pays ?? []).every((p) => p.collection_status === 'approved')
+    record('05 payments approved on create', allApproved, `${pays?.length ?? 0} rows`)
 
     const { data: order } = await admin
       .from('orders')
       .select('payment_status')
       .eq('id', sale.order_id)
       .single()
-    // ADR-0025 / M5C: customer axis — pending collections count as Collected → paid
     record(
-      '06 order paid on customer axis while collections pending',
+      '06 order paid after auto-posted collections',
       order?.payment_status === 'paid',
       order?.payment_status,
     )
@@ -288,7 +287,8 @@ async function main() {
     const types = (timeline ?? []).map((e) => e.event_type)
     record(
       '07a timeline has created + collection',
-      types.includes('order.created') && types.includes('collection.recorded'),
+      types.includes('order.created') &&
+        (types.includes('collection.recorded') || types.includes('collection.approved')),
       types.join(', '),
     )
   }
@@ -300,23 +300,23 @@ async function main() {
       rpc('get_shift_report', { p_shift_id: shiftId }),
     )
     record(
-      '08a pending count > 0',
-      Number(report?.pending_collections_count ?? 0) >= 2,
+      '08a pending count == 0 (auto-execute)',
+      Number(report?.pending_collections_count ?? 0) === 0,
       `count=${report?.pending_collections_count}`,
     )
 
     const approved = await expectOk(
-      '09 approve_pending_for_shift',
+      '09 approve_pending_for_shift residual',
       rpc('approve_pending_for_shift', { p_shift_id: shiftId }),
     )
     record(
-      '09a bulk approved collections',
-      Number(approved?.approved_count ?? 0) >= 2,
+      '09a bulk approved collections residual',
+      Number(approved?.approved_count ?? 0) === 0,
       `approved=${approved?.approved_count}`,
     )
     record(
-      '09b bulk approved expenses',
-      Number(approved?.approved_expenses_count ?? 0) >= 1,
+      '09b bulk approved expenses residual',
+      Number(approved?.approved_expenses_count ?? 0) === 0,
       `expenses=${approved?.approved_expenses_count}`,
     )
     if (expId) {
@@ -326,7 +326,7 @@ async function main() {
         .eq('id', expId)
         .single()
       record(
-        '09c expense executed after bulk approve',
+        '09c expense still executed',
         expDone?.status === 'executed',
         expDone?.status,
       )

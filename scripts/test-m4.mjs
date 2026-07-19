@@ -125,30 +125,33 @@ async function main() {
   record('02a drawer==700 & safe==300', near(b.drawer.balance, 700) && near(b.safe.balance, 300),
     `drawer=${b.drawer.balance} safe=${b.safe.balance}`)
 
-  // 3) Transfer safe -> digital 100, then approve ---------------------------
+  // 3) Transfer safe -> digital 100 (execute on create) ---------------------
   const { data: trId } = await rpc('create_transfer', {
     p_source_treasury_id: safe.id, p_dest_treasury_id: digital.id, p_amount: 100, p_reason: 'اختبار',
   })
-  await expectOk('03 approve_transfer(100)', rpc('approve_transfer', { p_id: trId }))
+  record('03 create_transfer returns id', Boolean(trId), String(trId))
+  // Legacy approve is idempotent no-op when already executed
+  await expectOk('03b approve_transfer no-op', rpc('approve_transfer', { p_id: trId }))
   b = await balances()
   record('03a safe==200 & digital==100', near(b.safe.balance, 200) && near(b.digital.balance, 100),
     `safe=${b.safe.balance} digital=${b.digital.balance}`)
 
-  // 4) Expense 50 from drawer, then approve ---------------------------------
+  // 4) Expense 50 from drawer (execute on create) ---------------------------
   const { data: expId } = await rpc('create_expense', {
     p_treasury_id: drawer.id, p_category: 'petty_cash', p_amount: 50,
     p_description: 'نثرية', p_vendor: null,
   })
-  await expectOk('04 approve_expense(50)', rpc('approve_expense', { p_id: expId }))
+  record('04 create_expense returns id', Boolean(expId), String(expId))
+  await expectOk('04b approve_expense no-op', rpc('approve_expense', { p_id: expId }))
   b = await balances()
   record('04a drawer==650', near(b.drawer.balance, 650), `drawer=${b.drawer.balance}`)
 
-  // 5) Reject (a new transfer) then Reverse (the executed expense) ----------
+  // 5) Reject executed transfer (= reverse) then reverse expense ------------
   const { data: rejId } = await rpc('create_transfer', {
     p_source_treasury_id: safe.id, p_dest_treasury_id: digital.id, p_amount: 10, p_reason: null,
   })
   await expectError('05a reject without reason', rpc('reject_transfer', { p_id: rejId, p_reason: '' }), 'REASON_REQUIRED')
-  await expectOk('05b reject_transfer(reason)', rpc('reject_transfer', { p_id: rejId, p_reason: 'خطأ إدخال' }))
+  await expectOk('05b reject_transfer(=reverse)', rpc('reject_transfer', { p_id: rejId, p_reason: 'خطأ إدخال' }))
   await expectError('05c reverse without reason', rpc('reverse_expense', { p_id: expId, p_reason: '' }), 'REASON_REQUIRED')
   await expectOk('05d reverse_expense(reason)', rpc('reverse_expense', { p_id: expId, p_reason: 'تصحيح' }))
   b = await balances()
@@ -156,11 +159,13 @@ async function main() {
 
   // 6) Overdraft attempts (must be rejected) --------------------------------
   await expectError('06a cash_drop > balance', rpc('cash_drop', { p_amount: 9_999_999, p_reason: null }), 'INSUFFICIENT_FUNDS')
-  const { data: bigExp } = await rpc('create_expense', {
-    p_treasury_id: digital.id, p_category: 'other', p_amount: 9_999_999, p_description: null, p_vendor: null,
-  })
-  await expectError('06b approve expense > balance', rpc('approve_expense', { p_id: bigExp }), 'INSUFFICIENT_FUNDS')
-  await rpc('reject_expense', { p_id: bigExp, p_reason: 'اختبار تجاوز الرصيد' })
+  await expectError(
+    '06b create expense > balance',
+    rpc('create_expense', {
+      p_treasury_id: digital.id, p_category: 'other', p_amount: 9_999_999, p_description: null, p_vendor: null,
+    }),
+    'INSUFFICIENT_FUNDS',
+  )
 
   // 7) Deactivate treasury holding balance (must be rejected) ---------------
   await expectError('07 deactivate non-empty treasury', rpc('set_treasury_status', { p_id: safe.id, p_active: false }), 'TREASURY_NOT_EMPTY')

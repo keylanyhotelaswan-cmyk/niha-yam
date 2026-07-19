@@ -1,9 +1,19 @@
 # ADR-0025: Revenue collection approval (F1 for POS payments)
 
-**Status:** Accepted (M5B Part A — locked 2026-07-08; **amended 2026-07-09** — customer payment vs approval axes; collected includes pending for ops UI — **M5C implements**; **amended again 2026-07-09** — operational drawer subtracts pending expenses — see [ADR-0028](./0028-pending-expense-approval-lifecycle.md))
+**Status:** **Superseded for operational money path (2026-07-19)** — collections execute on
+record; manager **Reject** = reverse with full audit. Pending→approve gate removed from product UX.
+Historical decision text below retained for archaeology.
 **Date:** 2026-07-08
 **Supersedes (partial):** M5A behaviour where `finalize_sale` posts ledger movements immediately on
-"pay" — M5B introduces an explicit collection approval gate before treasury impact.
+"pay" — M5B introduced an explicit collection approval gate (later removed 2026-07-19).
+
+### Amendment 2026-07-19 — execute now / reject = reverse
+
+Product policy: every cash-drawer / treasury-affecting collection posts ledger **immediately** on
+`finalize_sale` / `record_collection` (via auto-post trigger → `m5b_post_collection_ledger`).
+There is **no Approve wait**. Managers review the audit log; erroneous rows are **Rejected**, which
+delegates to `reverse_collection` (append-only reversal movement; original row kept as `reversed`).
+Operational drawer balance = shift ledger movements only (no pending-cash add-on).
 **Complements:** [ADR-0005](./0005-financial-approval-and-reversal-model.md) (F1),
 [ADR-0021](./0021-pos-thin-client-financial-core.md) (POS thin client),
 [ADR-0024](./0024-order-lifecycle-three-dimensions.md) (order vs payment dimensions),

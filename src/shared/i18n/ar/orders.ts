@@ -154,12 +154,12 @@ export const orders = {
     'delivery.driver_changed': 'تغيير الكابتن',
   },
   approval: {
-    title: 'اعتماد نهاية الوردية',
-    pendingCount: 'تحصيلات معلقة',
-    pendingTotal: 'إجمالي التحصيلات',
+    title: 'مراجعة حركات الوردية',
+    pendingCount: 'تحصيلات معلّقة (قديم)',
+    pendingTotal: 'إجمالي التحصيلات المعلّقة',
     byMethod: 'حسب وسيلة الدفع',
-    pendingExpenses: 'مصروفات معلقة',
-    pendingExpensesTotal: 'إجمالي المصروفات',
+    pendingExpenses: 'مصروفات معلّقة (قديم)',
+    pendingExpensesTotal: 'إجمالي المصروفات المعلّقة',
     byCategory: 'حسب التصنيف',
     expenseReason: 'سبب المصروف',
     approveAll: 'اعتماد الكل',
@@ -174,8 +174,8 @@ export const orders = {
       const parts: string[] = []
       if (collections > 0) parts.push(`${collections} تحصيل`)
       if (expenses > 0) parts.push(`${expenses} مصروف`)
-      if (parts.length === 0) return 'لا توجد عناصر للاعتماد.'
-      return `تم اعتماد ${parts.join(' و ')}.`
+      if (parts.length === 0) return 'لا توجد عناصر.'
+      return `تمت معالجة ${parts.join(' و ')}.`
     },
     rejectedAll: (collections: number, expenses: number) => {
       const parts: string[] = []
@@ -185,18 +185,18 @@ export const orders = {
       return `تم رفض ${parts.join(' و ')}.`
     },
     operationalDrawer: 'رصيد الدرج التشغيلي',
-    approvedRevenue: 'الإيراد المعتمد',
-    noPending: 'لا توجد عمليات معلقة.',
-    noPendingCollections: 'لا توجد تحصيلات معلقة.',
-    noPendingExpenses: 'لا توجد مصروفات معلقة.',
-    shiftKpis: 'ملخص إغلاق الوردية',
-    collectionsSection: 'التحصيلات المعلقة',
-    expensesSection: 'المصروفات المعلقة',
+    approvedRevenue: 'الإيراد المسجّل',
+    noPending: 'لا توجد عمليات معلّقة — الحركات تُنفَّذ فور التسجيل.',
+    noPendingCollections: 'لا توجد تحصيلات معلّقة.',
+    noPendingExpenses: 'لا توجد مصروفات معلّقة.',
+    shiftKpis: 'ملخص الوردية',
+    collectionsSection: 'تحصيلات معلّقة (قديم)',
+    expensesSection: 'مصروفات معلّقة (قديم)',
   },
   financial: {
-    title: 'تعديل مالي (بعد الاعتماد)',
-    hint: 'مسار append-only: عكس تحصيل أو تحصيل المتبقي — بدون تعديل أصناف.',
-    reverse: 'عكس تحصيل معتمد',
+    title: 'تعديل مالي',
+    hint: 'مسار append-only: رفض/عكس تحصيل أو تحصيل المتبقي — بدون تعديل أصناف.',
+    reverse: 'رفض / عكس تحصيل',
     reverseAction: 'عكس',
     reverseReason: 'سبب العكس',
     reversed: 'تم عكس التحصيل.',

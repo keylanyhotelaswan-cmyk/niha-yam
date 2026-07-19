@@ -1,10 +1,19 @@
 # ADR-0005: Financial approval & reversal model (cross-cutting principle)
 
-**Status:** Accepted (principle) · Implementation deferred (Planning Only)
+**Status:** Accepted (principle) · **Amended 2026-07-19** — operational money uses
+auto-execute + reject/reverse (no Approve wait); append-only audit unchanged.
 **Date:** 2026-07-07
 **Track:** F1 — Financial Approval Foundation (cross-cutting foundation track, not a feature module).
 **Applies to:** every balance-affecting operation, from M4 onward (Treasury, Orders/POS,
 Payments, Expenses, Reports).
+
+### Amendment 2026-07-19
+
+For POS/treasury operating money (collections, expenses, transfers, deposits/withdrawals, cash
+drops, purchases): create **auto-executes** to the ledger (`auto_approved` / status `executed` or
+collection `approved`). Manager review is soft; **Reject** creates a linked **reversal** — never
+hard-delete. The optional pending→approve path remains valid in principle for future high-risk
+flows, but is not used in the current product UX.
 
 ## Context
 

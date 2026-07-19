@@ -1,10 +1,17 @@
 # ADR-0028: Pending expense approval lifecycle (align with collections)
 
-**Status:** Accepted (M5 final operational fix — 2026-07-09)
+**Status:** **Superseded (2026-07-19)** — expenses (and all operational money ops) execute on
+create; Reject = reverse. Pending→approve gate removed.
 **Date:** 2026-07-09
 **Complements:** [ADR-0025](./0025-revenue-collection-approval.md),
 [ADR-0005](./0005-financial-approval-and-reversal-model.md),
 [ADR-0027](./0027-m5-close-out-financial-drivers.md)
+
+### Amendment 2026-07-19 — execute now / reject = reverse
+
+`pos_record_expense` / `create_expense` insert `status=executed` + `treasury_movements` immediately
+(`auto_approved=true`). Same for manager transfers and deposit/withdrawal. Manager **Reject** on an
+executed row calls `reverse_*` (append-only). No Approve step in UI. Close-shift no longer bulk-approves.
 
 ## Context
 
@@ -16,7 +23,7 @@ POS cashier expenses (`pos_record_expense`) previously:
 
 That broke the dual-balance model and treated expenses differently from collections.
 
-## Decision
+## Decision (historical — superseded 2026-07-19)
 
 > **Cashier financial ops share one lifecycle:** record → **pending** → manager approve/reject →
 > **ledger only on approve**. Append-only; never UPDATE prior ledger rows.

@@ -4,7 +4,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu'
 import { t } from '@/shared/i18n'
@@ -12,22 +11,19 @@ import type { FinStatus } from '@/features/treasury/types'
 
 type Props = {
   status: FinStatus
-  onApprove: () => void
   onReject: () => void
-  onReverse: () => void
 }
 
 /**
- * F1 lifecycle menu. Pending → approve/reject; executed → reverse. Terminal
- * states (rejected/reversed) expose no actions — records are immutable.
+ * Execute-now money lifecycle: pending (legacy) or executed → Reject
+ * (reject reverses executed rows server-side). Terminal states are immutable.
  */
-export function LifecycleActions({
-  status,
-  onApprove,
-  onReject,
-  onReverse,
-}: Props) {
+export function LifecycleActions({ status, onReject }: Props) {
   if (status === 'rejected' || status === 'reversed') {
+    return <span className="text-muted-foreground text-xs">—</span>
+  }
+
+  if (status !== 'pending' && status !== 'executed') {
     return <span className="text-muted-foreground text-xs">—</span>
   }
 
@@ -43,22 +39,9 @@ export function LifecycleActions({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {status === 'pending' ? (
-          <>
-            <DropdownMenuItem onSelect={onApprove}>
-              {t.treasury.lifecycle.approve}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onReject}>
-              {t.treasury.lifecycle.reject}
-            </DropdownMenuItem>
-          </>
-        ) : null}
-        {status === 'executed' ? (
-          <DropdownMenuItem onSelect={onReverse}>
-            {t.treasury.lifecycle.reverse}
-          </DropdownMenuItem>
-        ) : null}
+        <DropdownMenuItem onSelect={onReject}>
+          {t.treasury.lifecycle.reject}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   )

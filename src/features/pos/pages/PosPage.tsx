@@ -1118,7 +1118,6 @@ export function PosPage() {
       <CloseShiftDialog
         open={closeShiftOpen}
         shift={shift}
-        showApprovalStep={Boolean(ctx.can_approve_collections)}
         onOpenChange={(open) => {
           setCloseShiftOpen(open)
           if (!open) {

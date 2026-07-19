@@ -32,11 +32,11 @@ export const treasury = {
     bank: 'بنك',
   },
   status: {
-    pending: 'بانتظار الاعتماد',
-    approved: 'معتمد',
+    pending: 'معلّق (قديم)',
+    approved: 'منفّذ',
     rejected: 'مرفوض',
     executed: 'منفّذ',
-    reversed: 'ملغى',
+    reversed: 'ملغى / معكوس',
   },
   smartHandover: {
     title: 'ورقة استلام الوردية',
@@ -138,17 +138,17 @@ export const treasury = {
     variance: 'فرق العدّ',
     shortage: 'عجز',
     overage: 'زيادة',
-    approvedRevenue: 'إيراد معتمد',
-    pendingCollections: 'تحصيلات بانتظار الاعتماد',
-    pendingExpenses: 'مصروفات بانتظار الاعتماد',
+    approvedRevenue: 'إيراد مسجّل',
+    pendingCollections: 'تحصيلات معلّقة (قديم)',
+    pendingExpenses: 'مصروفات معلّقة (قديم)',
     pendingBeforeClose: (collections: number, expenses = 0) => {
       const parts: string[] = []
       if (collections > 0) parts.push(`${collections} تحصيل`)
       if (expenses > 0) parts.push(`${expenses} مصروف`)
       const label = parts.join(' و ') || 'عمليات'
-      return `يوجد ${label} بانتظار الاعتماد — يُفضّل اعتماد الكل قبل إغلاق الوردية.`
+      return `يوجد ${label} معلّق من بيانات قديمة — راجعها من السجل أو ارفضها.`
     },
-    closeWithPendingWarn: 'متابعة للإغلاق (مع عمليات بانتظار الاعتماد)',
+    closeWithPendingWarn: 'متابعة للإغلاق',
     collectionStatusHeading: 'حالة التحصيل',
     paymentMethodsHeading: 'طرق الدفع',
     operationalDrawer: 'رصيد الدرج التشغيلي',
@@ -196,7 +196,7 @@ export const treasury = {
       `الكاشير ${name} سلّم عهدة بقيمة ${amount}. بانتظار الاستلام.`,
     pendingNext: (name: string, amount: string) =>
       `الكاشير ${name} سلّم للوردية التالية عهدة بقيمة ${amount}.`,
-    receiveApprove: 'استلام واعتماد',
+    receiveApprove: 'استلام العهدة',
     reject: 'رفض',
     rejectTitle: 'رفض استلام العهدة',
     received: 'تم استلام العهدة واعتمادها',
@@ -250,7 +250,7 @@ export const treasury = {
     source: 'من خزنة',
     dest: 'إلى خزنة',
     reasonHint: 'سبب التحويل (اختياري).',
-    created: 'تم إنشاء التحويل — بانتظار الاعتماد',
+    created: 'تم تنفيذ التحويل',
     empty: 'لا توجد تحويلات بعد.',
     cashDropBadge: 'تحويل نقدي',
     colRoute: 'المسار',
@@ -263,7 +263,7 @@ export const treasury = {
     category: 'التصنيف',
     description: 'الوصف',
     vendor: 'المورّد / الجهة',
-    created: 'تم تسجيل المصروف — بانتظار الاعتماد',
+    created: 'تم تسجيل المصروف',
     empty: 'لا توجد مصروفات بعد.',
   },
   movementSource: {
@@ -296,7 +296,7 @@ export const treasury = {
     depositTitle: 'إيداع في خزنة',
     withdrawalTitle: 'سحب من خزنة',
     treasury: 'الخزنة',
-    created: 'تم إنشاء العملية — بانتظار الاعتماد',
+    created: 'تم تنفيذ العملية',
     empty: 'لا توجد عمليات بعد.',
     kind: 'النوع',
     kindDeposit: 'إيداع',
@@ -305,14 +305,16 @@ export const treasury = {
   lifecycle: {
     approve: 'اعتماد',
     reject: 'رفض',
-    reverse: 'إلغاء العملية',
-    approved: 'تم الاعتماد والتنفيذ',
-    rejected: 'تم الرفض',
-    reversed: 'تم الإلغاء',
+    reverse: 'رفض / عكس',
+    approved: 'تم التنفيذ',
+    rejected: 'تم الرفض وعكس الأثر',
+    reversed: 'تم الرفض وعكس الأثر',
     rejectTitle: 'رفض العملية',
-    reverseTitle: 'إلغاء العملية',
+    reverseTitle: 'رفض العملية',
+    rejectHint:
+      'الرفض لا يحذف السجل الأصلي، بل يُنشئ حركة عكسية ويُبقي سجل المراجعة كاملاً. سبب الرفض إجباري.',
     reverseHint:
-      'الإلغاء لا يحذف العملية، بل يُنشئ حركة عكسية مرتبطة بها. سبب الإلغاء إجباري.',
+      'الرفض لا يحذف السجل الأصلي، بل يُنشئ حركة عكسية ويُبقي سجل المراجعة كاملاً. سبب الرفض إجباري.',
   },
   settings: {
     treasuriesHeading: 'الخزائن',
