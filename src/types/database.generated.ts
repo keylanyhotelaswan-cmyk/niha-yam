@@ -381,6 +381,20 @@ export type Database = {
           amount: number
           change_given: number
           created_at: string
+          shift_id: string | null
+          collection_status: Database['public']['Enums']['collection_status']
+          net_amount: number | null
+          created_by: string | null
+          approved_by: string | null
+          rejected_by: string | null
+          reversed_by: string | null
+          approved_at: string | null
+          rejected_at: string | null
+          reversed_at: string | null
+          rejection_reason: string | null
+          reversal_reason: string | null
+          reverses_id: string | null
+          auto_approved: boolean
         }
         Insert: Partial<Database['public']['Tables']['order_payments']['Row']>
         Update: Partial<Database['public']['Tables']['order_payments']['Row']>
