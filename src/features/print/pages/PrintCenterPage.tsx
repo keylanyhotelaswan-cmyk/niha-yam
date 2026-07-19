@@ -9,7 +9,7 @@ import { PrintersTab } from '@/features/print/components/PrintersTab'
 import { QueueTab } from '@/features/print/components/QueueTab'
 import { SettingsTab } from '@/features/print/components/SettingsTab'
 import { TemplatesTab } from '@/features/print/components/TemplatesTab'
-import { TestingPrintArmedBanner } from '@/features/print/components/TestingPrintArmedBanner'
+import { TestingPrintSessionCard } from '@/features/print/components/TestingPrintSessionCard'
 import {
   usePrinterHealth,
   usePrinters,
@@ -68,7 +68,13 @@ export function PrintCenterPage() {
         actions={<BridgeDownloadButton />}
       />
 
-      <TestingPrintArmedBanner />
+      <TestingPrintSessionCard
+        health={health.data}
+        printers={printers.data ?? []}
+        onRetryHealth={() => {
+          void health.refetch()
+        }}
+      />
 
       {!isLoading && !isError ? (
         <PrintCenterStatusBar health={health.data} />

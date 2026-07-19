@@ -49,14 +49,18 @@ public sealed class PairForm : Form
             AutoScroll = true,
         };
 
-        var hintText = forceTarget is null
-            ? Ar.PairHint
-            : string.Format(Ar.RePairHintFmt, EnvName(forceTarget));
+        var addingSecond =
+            forceTarget is null && cfg.PairedConnections().Any();
+        var hintText = forceTarget is not null
+            ? string.Format(Ar.RePairHintFmt, EnvName(forceTarget))
+            : addingSecond
+                ? Ar.PairAddingSecondEnv + "\n" + Ar.PairHint
+                : Ar.PairHint;
         var hint = new Label
         {
             Text = hintText,
             AutoSize = false,
-            Height = 56,
+            Height = addingSecond ? 88 : 64,
             Dock = DockStyle.Top,
             ForeColor = NihaTheme.Muted,
             Font = NihaTheme.UiFont(9.5f),

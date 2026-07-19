@@ -49,9 +49,19 @@ public sealed class ConnectionsForm : Form
         var footer = new Panel
         {
             Dock = DockStyle.Bottom,
-            Height = 140,
+            Height = 168,
             Padding = new Padding(16, 8, 16, 12),
             BackColor = NihaTheme.Background,
+        };
+
+        var addHint = new Label
+        {
+            Text = Ar.AddEnvironmentHint,
+            Dock = DockStyle.Top,
+            Height = 28,
+            ForeColor = NihaTheme.Muted,
+            Font = NihaTheme.UiFont(8.5f),
+            TextAlign = ContentAlignment.MiddleRight,
         };
 
         var addBtn = NihaTheme.PrimaryButton(Ar.AddEnvironment);
@@ -71,14 +81,16 @@ public sealed class ConnectionsForm : Form
         closeBtn.Height = 36;
         closeBtn.Click += (_, _) => Close();
 
-        footer.Controls.Add(addBtn);
+        // Dock.Top: last added sits closest to the top edge.
         footer.Controls.Add(resetBtn);
+        footer.Controls.Add(addBtn);
+        footer.Controls.Add(addHint);
         footer.Controls.Add(closeBtn);
 
         _hint = new Label
         {
             Dock = DockStyle.Top,
-            Height = 52,
+            Height = 68,
             Padding = new Padding(16, 8, 16, 0),
             Text = Ar.ManageConnectionsHint,
             ForeColor = NihaTheme.Muted,

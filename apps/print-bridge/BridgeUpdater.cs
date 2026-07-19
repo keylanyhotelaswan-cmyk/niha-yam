@@ -170,13 +170,37 @@ public static class BridgeUpdater
             var srcEsc = srcDir.Replace("\"", "");
             var destEsc = destDir.Replace("\"", "");
             var exeName = Path.GetFileName(Application.ExecutablePath);
+            var pid = Environment.ProcessId;
+            // Wait for this PID to exit (file unlock), then retry xcopy — avoids silent
+            // failed updates when the self-contained EXE is still locked.
             File.WriteAllText(script, $"""
 @echo off
 chcp 65001 >nul
-timeout /t 2 /nobreak >nul
-xcopy /y /e /i /q "{srcEsc}\*" "{destEsc}\"
-if errorlevel 1 exit /b 1
-start "" "{destEsc}\{exeName}"
+set "SRC={srcEsc}"
+set "DEST={destEsc}"
+set "EXE={exeName}"
+set "PID={pid}"
+set /a ATTEMPTS=0
+
+:waitpid
+set /a ATTEMPTS+=1
+tasklist /FI "PID eq %PID%" 2>nul | find "%PID%" >nul
+if errorlevel 1 goto copyfiles
+if %ATTEMPTS% GEQ 60 goto copyfiles
+timeout /t 1 /nobreak >nul
+goto waitpid
+
+:copyfiles
+set /a COPYTRY=0
+:copyretry
+set /a COPYTRY+=1
+xcopy /y /e /i /q "%SRC%\*" "%DEST%\"
+if errorlevel 1 (
+  if %COPYTRY% GEQ 10 exit /b 1
+  timeout /t 1 /nobreak >nul
+  goto copyretry
+)
+start "" "%DEST%\%EXE%"
 """, System.Text.Encoding.Default);
 
             progress?.Report((Ar.UpdateRestarting, 100));

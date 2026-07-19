@@ -12,11 +12,14 @@ public static class Ar
     public const string Save = "حفظ";
     public const string PairCode = "رمز الاقتران";
     public const string PairHint =
-        "الصق رمز الربط الكامل أو امسح QR — الرمز القصير يكفي لبيئة واحدة فقط (الإنتاج عادة).";
+        "الصق رمز الربط الكامل أو امسح QR — الرمز القصير يكفي لبيئة واحدة فقط (الإنتاج عادة).\n" +
+        "إضافة بيئة اختبار لا تمسح الإنتاج: تُضاف بجانب الاتصال الحالي.";
     public const string PairSuccess = "تم الاقتران بنجاح";
     public const string PairFailed = "فشل الاقتران";
     public const string Pairing = "جاري الاقتران…";
     public const string PairReadyEnvFmt = "جاهز للربط: {0}";
+    public const string PairAddingSecondEnv =
+        "سيتم إضافة بيئة ثانية (اختبار عادة) بجانب الإنتاج — لن يُمسح الربط الحالي.";
     public const string ScanQr = "مسح QR";
     public const string ScanQrHint =
         "بدون كاميرا: انسخ «رمز الربط الكامل» من مركز الطباعة ثم الصق الرمز.\n" +
@@ -30,8 +33,11 @@ public static class Ar
     public const string InvalidCode = "رمز الاقتران غير صالح";
     public const string NeedQrForSecondEnv =
         "لا يمكن استخدام الرمز المختصر عند ربط بيئة إضافية.\n\n" +
-        "الصق «رمز الربط الكامل» أو امسح رمز QR — كلاهما يحتوي على عنوان السحابة. " +
-        "الرمز القصير وحده لا يكفي ويُربَط بالإنتاج الحالي فقط.";
+        "الصق «رمز الربط الكامل» أو امسح رمز QR من مركز طباعة الاختبار.\n" +
+        "هذا يُضيف بيئة ثانية فقط — الإنتاج يبقى مربوطًا. لا تحذف اتصال الإنتاج.";
+    public const string AlreadyRunning =
+        "برنامج NIHA Print Bridge يعمل بالفعل على هذا الجهاز.\n" +
+        "أغلق النسخة الأخرى من شريط المهام ثم أعد المحاولة.";
 
     public const string Connecting = "جاري الاتصال";
     public const string Connected = "متصل";
@@ -62,10 +68,13 @@ public static class Ar
     public const string ManageConnections = "إدارة الاتصالات";
     public const string ManageConnectionsHint =
         "الاتصال ≠ الطباعة. لكل بيئة: Poll · Claim · مطبوع · آخر خطأ · مسار الدورة.\n" +
+        "لاختبار بيئة الاختبار: «إضافة بيئة» برمز الربط الكامل — لا تمسح الإنتاج.\n" +
         "«إعادة الاقتران» يعيد ربط بيئة واحدة دون حذف الأخرى.";
     public const string NoConnections =
         "لا توجد اتصالات محفوظة. اضغط «إضافة بيئة» أو الصق رمز الربط الكامل.";
-    public const string AddEnvironment = "إضافة بيئة جديدة";
+    public const string AddEnvironment = "إضافة بيئة اختبار / جديدة";
+    public const string AddEnvironmentHint =
+        "يُضاف اتصال ثانٍ (مثل الاختبار) بجانب الإنتاج. الإنتاج لا يُمس.";
     public const string RePairConnection = "إعادة الاقتران";
     public const string RePairHintFmt =
         "إعادة اقتران «{0}» فقط — بقية البيئات لن تُمس.\n" +

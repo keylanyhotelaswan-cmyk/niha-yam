@@ -46,7 +46,8 @@
     "test:line-note": "node --experimental-strip-types scripts/test-line-note.ts",
     "test:field-text": "node --experimental-strip-types scripts/test-field-text.ts",
     "bridge:publish": "node scripts/publish-print-bridge.mjs",
-    "test:print-dual-env": "node scripts/test-print-dual-env.mjs"
+    "test:print-dual-env": "node scripts/test-print-dual-env.mjs",
+    "test:portable-printer": "node scripts/test-portable-printer.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

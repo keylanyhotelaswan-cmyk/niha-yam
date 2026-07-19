@@ -26,6 +26,10 @@
 
 Install/update Bridge from Print Center → تنزيل Bridge on each cashier PC, then pair (or resume). Auto-remap runs on inventory/heartbeat.
 
+### Portable ownership (2026-07-19 · Bridge 0.5.8+)
+
+Moving one thermal between PCs: **Pair on the new PC**. `pair_print_bridge` + `m6_transfer_restaurant_print_ownership` deactivate other Bridges for the restaurant and reroute printers/open jobs. Sole-printer auto-bind can also take ownership when inventory sees the thermal even if the previous Bridge is still online. Test: `pnpm test:portable-printer`.
+
 ## Plain-Arabic diagnostics (2026-07-16)
 
 ✅ **Production** — migration `20260716120000_print_diag_plain_arabic.sql` · UI https://niha-yam.vercel.app · [details](./print-diagnostics-plain-arabic.md)  

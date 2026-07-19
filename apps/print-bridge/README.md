@@ -59,7 +59,9 @@ Arabic lines are drawn with **GDI+ Uniscribe** (joined RTL), then sent as
 3. Bridge online in Print Center → Health  
 4. POS order → jobs → paper  
 5. Check for update → What’s New → Update Now → restart keeps pairing  
-6. Dual-env: paste Testing Pairing Token → both envs stay  
+6. Dual-env: paste Testing Pairing Token → both envs stay (does not wipe Production)  
+7. Move printer to another PC → Pair once → ownership follows the new device  
+
 
 ## Autostart
 

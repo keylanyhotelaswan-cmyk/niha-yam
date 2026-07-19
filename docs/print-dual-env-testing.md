@@ -23,9 +23,19 @@ Use one cashier PC, one physical printer, and one NIHA Print Bridge install for 
 
 1. Keep Production Bridge paired as usual.
 2. Open Testing Print Center → Diagnostics → bootstrap runs automatically (`testing_print_enabled` stays **OFF** by default).
-3. Once: **ربط بيئة** — copy **رمز الربط الكامل** (no camera) or scan Testing QR (adds second connection).
+3. Once: Bridge → **إضافة بيئة** — copy **رمز الربط الكامل** (no camera) or scan Testing QR (adds second connection). **Do not** full re-pair / wipe Production.
 4. **تفعيل الطباعة للاختبار** only while testing (confirm dialog + red armed banner across Print Center).
 5. **إيقاف فوري** as soon as the test ends — Production keeps printing normally.
+
+### Portable printer (one thermal, many PCs)
+
+When the physical printer moves to another cashier PC: **Pair once on the new PC**. Server-side ownership transfer (`m6_transfer_restaurant_print_ownership`) deactivates other Bridges for that restaurant and reroutes printers + open jobs to the new Bridge. No need to hunt zombie Bridge IDs.
+
+| Situation | Action |
+| --- | --- |
+| Update Bridge on same PC | In-app Update — **no** Re-pair |
+| Move printer to another PC | Pair once on the new PC |
+| Test on Testing | Add second connection + toggle — **no** full re-pair |
 
 During live service hours leave the toggle **OFF**. The claim gate blocks Testing jobs; the armed banner exists so an ON state is hard to miss.
 

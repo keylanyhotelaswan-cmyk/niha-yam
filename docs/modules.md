@@ -24,7 +24,10 @@ switches from invite links to direct creation (ADR-0018).
 > **Official Baseline:** [NIHA ERP Operational v1.1](./release-operational-v1.1.md) · tag `v1.1.0-production` · App **1.1.0**.  
 > **Print Bridge baseline:** **0.5.0** — dual-environment connections ([print-dual-env-testing.md](./print-dual-env-testing.md)); do not change multi-connection behavior without explicit review.  
 > Ops area: **bug / perf / simple UX only** — no new ops features.  
-> **Next capability:** **Suppliers & Purchasing** — [plan Approved 1.0](./suppliers-purchasing-plan.md) (2026-07-15) · Implement gated on PURA kickoff on Testing.  
+> **Purchasing:** **PURA/PURB ✅ Production + Freeze** · **PURC = next** (kickoff pending).  
+> **Printing:** **Feature Freeze مغلق** — Bridge **0.5.0** baseline · Hotfix **0.5.8** portable ownership.  
+> **Liquidity + Smart Handover Sheet:** ✅ **Production + Feature Freeze** (2026-07-16).  
+> **Test policy:** [ADR-0035](./adr/0035-production-readonly-tests.md) — smoke/test/sim/fuzz/chaos **never mutate Production** (Testing only for writes).  
 > **M7 KDS** remains deferred until paper workflow needs a screen.
 
 | #      | Module                           | Scope summary                                                                                                                                                                                                            | Depends on | Status                                                                     |
@@ -36,7 +39,7 @@ switches from invite links to direct creation (ADR-0018).
 | M3     | Menu & Products                  | POS-oriented catalog: categories, items (operational flags incl. `is_favorite` S7), full modifiers; `list_menu_for_pos` for M5; **no tax**; legacy import after M3 approval ([ADR-0020](./adr/0020-operations-first.md)) | U1         | ✅ Approved (2026-07-08) · Legacy import done (12 categories, 56 products) |
 | M4     | Treasury & Money Flow            | Multi-treasury accounts + append-only ledger (F1), shifts + reconciliation, cash drop, **general any→any transfers**, expenses, deposit/withdrawal, financial references, computed balances/reports; config-driven payment-method linkage                                                                                                                         | U1         | ✅ Approved (2026-07-08) — 26/26 E2E (`pnpm test:m4`); general transfers verified |
 | M5     | POS & Orders                     | **M5A** POS Core · **M5B** Orders hub, Delivery, customers, collection approval, timeline · **M5C** Pending free-edit, review queue, financial-only post-approve · pending expense lifecycle ([ADR-0024](./adr/0024-order-lifecycle-three-dimensions.md)–[ADR-0028](./adr/0028-pending-expense-approval-lifecycle.md)) | M3, M4     | ✅ **Approved (2026-07-09)** — M5A/B/C · all suites green · **POS feature freeze** (bug/perf/UX only; functional work → **M6 Printing**) |
-| **M6** | **Printing & Order Execution**   | M6A · M6B Bridge+TTL · M6C **Print Center only** ([ADR-0030](./adr/0030-niha-print-bridge.md) BP-1…**15**) · WYSIWYG · draft-orders direction [ADR-0031](./adr/0031-draft-orders-db-direction.md) · [m6-final-review.md](./m6-final-review.md) · **Print Fields Completeness** [plan](./print-fields-completeness-plan.md) · [final](./print-fields-completeness-final-review.md) · **Dual Env Printing** [docs](./print-dual-env-testing.md) · Bridge **0.5.0** baseline | M5         | ✅ **Approved** · **Printing feature freeze** · Dual Env Printing + Bridge **0.5.0** baseline (2026-07-17) |
+| **M6** | **Printing & Order Execution**   | M6A · M6B Bridge+TTL · M6C **Print Center only** ([ADR-0030](./adr/0030-niha-print-bridge.md) BP-1…**15**) · WYSIWYG · draft-orders direction [ADR-0031](./adr/0031-draft-orders-db-direction.md) · [m6-final-review.md](./m6-final-review.md) · **Print Fields Completeness** [plan](./print-fields-completeness-plan.md) · [final](./print-fields-completeness-final-review.md) · [تشخيص عربي](./print-diagnostics-plain-arabic.md) · [مطابقة ذكية](./smart-printer-rematch.md) · **Dual Env** [docs](./print-dual-env-testing.md) · Bridge **0.5.0** baseline | M5         | ✅ **Approved** · **Printing Feature Freeze** · Dual Env Printing + Bridge **0.5.0** baseline (2026-07-17) |
 | M7     | Kitchen Display (KDS)            | Item/ticket status UI + Realtime — **optional consumer** of the same order events / print-job stream; no rewrite of M6                                                                                                                                 | M6         | ⏳ Deferred until paper workflow needs a screen ([ADR-0029](./adr/0029-m6-printing-before-kds.md)) |
 | **M8** | **Reports**                      | Read-only compute-from-source · S0–S8 · [m8-reports-plan.md](./m8-reports-plan.md) · [m8-final-review.md](./m8-final-review.md) · [ADR-0032](./adr/0032-reports-compute-from-source.md) | M4–M6      | ✅ **Approved (2026-07-12)** — M8A+M8B · `test:m8` 25/25 · **Reports feature freeze** · **Operational V1.0** |
 
@@ -53,7 +56,9 @@ Governed by [NIHA ERP Vision 2.0](./niha-erp-vision-2.0.md) · [ADR-0033](./adr/
 | Inventory — **INVA** | [plan](./inventory-plan.md) · [INVA final review](./inventory-final-review-inva.md) | ✅ **INVA Approved (2026-07-12)** · `test:inventory` 20/20 · **Inventory Feature Freeze (INVA)** |
 | Inventory — **INVB** | — | ⏸ Blocked — spine candidate; **not** auto-next if live ops prioritize Purchasing |
 | Inventory — **INVC** | — | ⏸ After INVB (if counts land before consumption) |
-| Suppliers & Purchasing | [plan](./suppliers-purchasing-plan.md) | ✅ **Plan Approved 1.0** (2026-07-15) · Q-PUR locked · Implement ⏸ until PURA kickoff on Testing · freezes intact |
+| Suppliers & Purchasing | [plan](./suppliers-purchasing-plan.md) · [PURA](./purchasing-final-review-pura.md) · [PURB](./purchasing-final-review-purb.md) · [ops-day](./ops-day-simulation-report.md) | ✅ **PURA/PURB Production + Freeze** · ▶️ **PURC next** (kickoff pending) |
+| Liquidity (تشغيل/محفوظ) | [final](./liquidity-final-review.md) | ✅ **Production + Feature Freeze** (2026-07-16) |
+| Smart Shift Handover Sheet | [final](./smart-shift-handover-final-review.md) | ✅ **Production + Feature Freeze** (2026-07-16) · review-only |
 | Payroll & HR | — | ⏳ |
 | Promotions | — | ⏳ |
 | AI Operating Assistant | — | ⏳ |

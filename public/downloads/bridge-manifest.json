@@ -1,13 +1,13 @@
 {
   "name": "NIHA Print Bridge",
-  "version": "0.5.7",
+  "version": "0.5.8",
   "file": "niha-print-bridge-win-x64.zip",
   "url": "/downloads/niha-print-bridge-win-x64.zip",
-  "setupFile": "NihaPrintBridge-Setup.exe",
-  "setupUrl": "/downloads/NihaPrintBridge-Setup.exe",
+  "setupFile": null,
+  "setupUrl": null,
   "platform": "win-x64",
   "selfContained": true,
-  "publishedAt": "2026-07-18T15:19:36.712Z",
-  "sizeBytes": 67049425,
-  "notes": "تقرير غلق/تسليم الوردية الكامل: ملخص تشغيلي، تحصيل، أكثر الأصناف، نقد وعهدة"
+  "publishedAt": "2026-07-19T14:40:16.145Z",
+  "sizeBytes": 67052111,
+  "notes": "ملكية الطابعة تتبع الجهاز الحالي عند النقل بين أجهزة (سيرفر + Pair)\nتحديث أوضح: انتظار إغلاق البرنامج + إعادة محاولة النسخ قبل إعادة التشغيل\nمنع تشغيل نسختين من البرنامج على نفس الجهاز\nتوضيح إضافة بيئة الاختبار بدون مسح الإنتاج"
 }
