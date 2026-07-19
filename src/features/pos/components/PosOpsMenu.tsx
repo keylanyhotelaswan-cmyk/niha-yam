@@ -9,7 +9,6 @@ import {
 import { Button } from '@/shared/components/ui/button'
 import { CashDropDialog } from '@/features/treasury/components/dialogs/CashDropDialog'
 import { ShiftSummary } from '@/features/treasury/components/ShiftSummary'
-import { PosShiftDrawerHub } from '@/features/pos/components/PosShiftDrawerHub'
 import { FinancialMovementDialog } from '@/features/pos/components/FinancialMovementDialog'
 import { PosFeedbackDialog } from '@/features/ops-feedback/components/PosFeedbackDialog'
 import { posKeys } from '@/features/pos/hooks/pos.keys'
@@ -164,10 +163,6 @@ export function PosOpsMenu({
                 collectionStatusTotals={collectionStatusTotals}
                 paymentMethodTotals={paymentMethodTotals}
                 trustCashTotal={trustCashTotal}
-              />
-              <PosShiftDrawerHub
-                shift={shift}
-                operationalTreasuries={ctx.operational_treasuries}
               />
             </>
           ) : null}

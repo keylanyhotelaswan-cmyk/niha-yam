@@ -48,7 +48,6 @@ import { formatMoney } from '@/features/treasury/utils/format'
 import { cn } from '@/shared/utils/cn'
 import { t } from '@/shared/i18n'
 import { ShiftSummary } from '@/features/treasury/components/ShiftSummary'
-import { PosShiftDrawerHub } from '@/features/pos/components/PosShiftDrawerHub'
 import type { ShiftReport } from '@/features/treasury/types'
 
 type HubFilter =
@@ -1091,10 +1090,6 @@ export function PosPage() {
                 collectionStatusTotals={collectionStatusTotals}
                 paymentMethodTotals={collectionPaymentTotals}
                 trustCashTotal={trustCashTotal}
-              />
-              <PosShiftDrawerHub
-                shift={shift}
-                operationalTreasuries={ctx.operational_treasuries}
               />
             </>
           ) : (

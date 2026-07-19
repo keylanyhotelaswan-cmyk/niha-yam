@@ -1,10 +1,6 @@
 import { useMemo, useState } from 'react'
-import { toast } from 'sonner'
-import { LifecycleActions } from '@/features/treasury/components/LifecycleActions'
 import { StatusBadge } from '@/features/treasury/components/StatusBadge'
 import { AdjustmentDialog } from '@/features/treasury/components/dialogs/AdjustmentDialog'
-import { ReasonDialog } from '@/features/treasury/components/dialogs/ReasonDialog'
-import { useRejectAdjustment } from '@/features/treasury/hooks/useTreasuryMutations'
 import { formatDateTime, formatMoney } from '@/features/treasury/utils/format'
 import type { AdjustmentRow, TreasuryRow } from '@/features/treasury/types'
 import { Button } from '@/shared/components/ui/button'
@@ -29,35 +25,21 @@ type CreateState = { kind: 'deposit' | 'withdrawal' } | null
 
 export function AdjustmentsTab({ adjustments, treasuries }: Props) {
   const [create, setCreate] = useState<CreateState>(null)
-  const [rejectId, setRejectId] = useState<string | null>(null)
-  const [reasonError, setReasonError] = useState<string | null>(null)
-
-  const reject = useRejectAdjustment()
 
   const name = useMemo(() => {
     const map = new Map(treasuries.map((tr) => [tr.id, tr.name]))
     return (id: string) => map.get(id) ?? t.treasury.common.none
   }, [treasuries])
 
-  function onConfirmReason(text: string) {
-    if (!rejectId) return
-    setReasonError(null)
-    reject.mutate(
-      { id: rejectId, reason: text },
-      {
-        onSuccess: () => {
-          toast.success(t.treasury.lifecycle.rejected)
-          setRejectId(null)
-        },
-        onError: (e: Error) => setReasonError(e.message),
-      },
-    )
-  }
-
   return (
     <Card>
       <CardHeader className="flex-row items-center justify-between gap-4">
-        <CardTitle>{t.treasury.adjustments.heading}</CardTitle>
+        <div>
+          <CardTitle>{t.treasury.adjustments.heading}</CardTitle>
+          <p className="text-muted-foreground mt-1 text-xs">
+            {t.treasury.drawerMovements.rejectFromDrawerOnly}
+          </p>
+        </div>
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -87,16 +69,13 @@ export function AdjustmentsTab({ adjustments, treasuries }: Props) {
               </TableHead>
               <TableHead>{t.treasury.common.status}</TableHead>
               <TableHead>{t.treasury.common.date}</TableHead>
-              <TableHead className="w-16 text-end">
-                {t.treasury.common.actions}
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {adjustments.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={6}
                   className="text-muted-foreground py-8 text-center text-sm"
                 >
                   {t.treasury.adjustments.empty}
@@ -125,15 +104,6 @@ export function AdjustmentsTab({ adjustments, treasuries }: Props) {
                   <TableCell className="text-muted-foreground text-xs">
                     {formatDateTime(adj.created_at)}
                   </TableCell>
-                  <TableCell className="text-end">
-                    <LifecycleActions
-                      status={adj.status}
-                      onReject={() => {
-                        setReasonError(null)
-                        setRejectId(adj.id)
-                      }}
-                    />
-                  </TableCell>
                 </TableRow>
               ))
             )}
@@ -149,17 +119,6 @@ export function AdjustmentsTab({ adjustments, treasuries }: Props) {
           onOpenChange={(next) => !next && setCreate(null)}
         />
       ) : null}
-      <ReasonDialog
-        open={rejectId !== null}
-        title={t.treasury.lifecycle.rejectTitle}
-        hint={t.treasury.lifecycle.rejectHint}
-        confirmLabel={t.treasury.lifecycle.reject}
-        destructive
-        pending={reject.isPending}
-        submitError={reasonError}
-        onConfirm={onConfirmReason}
-        onOpenChange={(next) => !next && setRejectId(null)}
-      />
     </Card>
   )
 }

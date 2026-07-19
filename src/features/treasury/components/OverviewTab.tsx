@@ -6,6 +6,7 @@ import { PendingHandoverBanner } from '@/features/treasury/components/PendingHan
 import { usePendingHandovers } from '@/features/treasury/hooks/useTreasuryQueries'
 import { CashDropDialog } from '@/features/treasury/components/dialogs/CashDropDialog'
 import { CloseShiftDialog } from '@/features/treasury/components/dialogs/CloseShiftDialog'
+import { DrawerMovementsDialog } from '@/features/treasury/components/dialogs/DrawerMovementsDialog'
 import { LedgerDialog } from '@/features/treasury/components/dialogs/LedgerDialog'
 import { OpenShiftDialog } from '@/features/treasury/components/dialogs/OpenShiftDialog'
 import { ShiftSummary } from '@/features/treasury/components/ShiftSummary'
@@ -26,7 +27,7 @@ type Props = {
   openShift: OpenShift | null
 }
 
-type LedgerState = { id: string; name: string } | null
+type LedgerState = { id: string; name: string; isDrawer: boolean } | null
 
 export function OverviewTab({ balances, openShift }: Props) {
   const [openShiftDialog, setOpenShiftDialog] = useState(false)
@@ -170,9 +171,17 @@ export function OverviewTab({ balances, openShift }: Props) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setLedger({ id: b.id, name: b.name })}
+                    onClick={() =>
+                      setLedger({
+                        id: b.id,
+                        name: b.name,
+                        isDrawer: b.is_shift_drawer,
+                      })
+                    }
                   >
-                    {t.treasury.overview.viewLedger}
+                    {b.is_shift_drawer
+                      ? t.treasury.overview.viewDrawerMovements
+                      : t.treasury.overview.viewLedger}
                   </Button>
                 </CardContent>
               </Card>
@@ -192,7 +201,16 @@ export function OverviewTab({ balances, openShift }: Props) {
       />
       <CashDropDialog open={cashDropDialog} onOpenChange={setCashDropDialog} />
       <DeliveryDriversDialog open={driversOpen} onOpenChange={setDriversOpen} />
-      {ledger ? (
+      {ledger?.isDrawer ? (
+        <DrawerMovementsDialog
+          open
+          drawerTreasuryId={ledger.id}
+          drawerName={ledger.name}
+          openShift={openShift}
+          balances={balances}
+          onOpenChange={(next) => !next && setLedger(null)}
+        />
+      ) : ledger ? (
         <LedgerDialog
           open
           treasuryId={ledger.id}
