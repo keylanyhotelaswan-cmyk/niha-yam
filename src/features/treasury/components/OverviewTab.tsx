@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ArrowDownUp, Bike, Wallet } from 'lucide-react'
 import { CollectionApprovalDialog } from '@/features/orders/components/CollectionApprovalDialog'
 import { DeliveryDriversDialog } from '@/features/drivers/components/DeliveryDriversDialog'
+import { LiquidityPanel } from '@/features/treasury/components/LiquidityPanel'
 import { PendingHandoverBanner } from '@/features/treasury/components/PendingHandoverBanner'
 import { usePendingHandovers } from '@/features/treasury/hooks/useTreasuryQueries'
 import { CashDropDialog } from '@/features/treasury/components/dialogs/CashDropDialog'
@@ -53,6 +54,7 @@ export function OverviewTab({ balances, openShift }: Props) {
   return (
     <div className="space-y-6">
       <PendingHandoverBanner />
+      <LiquidityPanel />
 
       {/* Shift */}
       <Card>

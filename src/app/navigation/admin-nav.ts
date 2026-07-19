@@ -14,6 +14,7 @@ import {
   Wallet,
   ChefHat,
   Package,
+  ShoppingCart,
   MessageSquareText,
   type LucideIcon,
 } from 'lucide-react'
@@ -63,6 +64,13 @@ export const adminNav: NavItem[] = [
     label: t.shell.nav.inventory,
     icon: Package,
     permission: 'inventory.manage',
+  },
+  {
+    id: 'purchasing',
+    to: '/admin/purchasing',
+    label: t.shell.nav.purchasing,
+    icon: ShoppingCart,
+    permission: 'purchase.direct.create',
   },
   {
     id: 'treasury',

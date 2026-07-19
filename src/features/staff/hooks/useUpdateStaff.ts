@@ -9,6 +9,10 @@ type UpdateStaffArgs = {
   branchId: string
   role: string
   discountPermissions?: DiscountPermissionConfig | null
+  canOperationalPurchase?: boolean
+  setOperationalPurchase?: boolean
+  canPrintManage?: boolean
+  setPrintManage?: boolean
 }
 
 /** Update a staff member's name + role + discount permissions, then invalidate the list. */

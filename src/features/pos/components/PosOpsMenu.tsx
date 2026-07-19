@@ -9,9 +9,8 @@ import {
 import { Button } from '@/shared/components/ui/button'
 import { CashDropDialog } from '@/features/treasury/components/dialogs/CashDropDialog'
 import { ShiftSummary } from '@/features/treasury/components/ShiftSummary'
-import { PosExpenseDialog } from '@/features/pos/components/PosExpenseDialog'
 import { PosShiftExpensesPanel } from '@/features/pos/components/PosShiftExpensesPanel'
-import { PosTransferDialog } from '@/features/pos/components/PosTransferDialog'
+import { FinancialMovementDialog } from '@/features/pos/components/FinancialMovementDialog'
 import { PosFeedbackDialog } from '@/features/ops-feedback/components/PosFeedbackDialog'
 import { posKeys } from '@/features/pos/hooks/pos.keys'
 import { useCollectionTotals } from '@/features/pos/hooks/useTodayOrderTotals'
@@ -56,8 +55,7 @@ export function PosOpsMenu({
   })
   const [shiftOpen, setShiftOpen] = useState(false)
   const [cashDropOpen, setCashDropOpen] = useState(false)
-  const [transferOpen, setTransferOpen] = useState(false)
-  const [expenseOpen, setExpenseOpen] = useState(false)
+  const [financialOpen, setFinancialOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   const hasShift = Boolean(shift)
@@ -107,21 +105,10 @@ export function PosOpsMenu({
               disabled={!hasShift}
               onClick={() => {
                 closeMenu()
-                setTransferOpen(true)
+                setFinancialOpen(true)
               }}
             >
-              {t.pos.ops.transfer}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!hasShift}
-              onClick={() => {
-                closeMenu()
-                setExpenseOpen(true)
-              }}
-            >
-              {t.pos.ops.expense}
+              {t.pos.ops.financialMovement}
             </Button>
             <Button
               type="button"
@@ -192,20 +179,13 @@ export function PosOpsMenu({
         }}
       />
 
-      <PosTransferDialog
-        open={transferOpen}
+      <FinancialMovementDialog
+        open={financialOpen}
         treasuries={ctx.operational_treasuries}
         shiftId={shift?.id ?? null}
+        canOperationalPurchase={Boolean(ctx.can_operational_purchase)}
         onOpenChange={(next) => {
-          setTransferOpen(next)
-          if (!next) refreshContext()
-        }}
-      />
-
-      <PosExpenseDialog
-        open={expenseOpen}
-        onOpenChange={(next) => {
-          setExpenseOpen(next)
+          setFinancialOpen(next)
           if (!next) refreshContext()
         }}
       />

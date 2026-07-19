@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
+import { refuseProductionMutations } from './script-safety.mjs'
 
 /**
  * INVA — Inventory movements, Stock Card, dashboard (qty only).
@@ -48,10 +49,11 @@ async function expectError(name, promise, code) {
 }
 
 async function main() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anon = env.VITE_SUPABASE_ANON_KEY
-  assertSupabaseUrl(url)
+  assertTestingTarget(url)
+  refuseProductionMutations(url)
   if (!anon) {
     console.error('Missing VITE_SUPABASE_ANON_KEY')
     process.exit(1)
@@ -90,30 +92,24 @@ async function main() {
       dash.signals != null,
   )
 
-  const ings = await expectOk('03 list_ingredients', rpc('list_ingredients', { p_active_only: true }))
-  let ingredientId = ings?.[0]?.id
-  let uomId = ings?.[0]?.base_uom_id
-
-  if (!ingredientId) {
-    const uoms = await rpc('rc_bootstrap_uoms')
-    const kg = (uoms.data ?? []).find((u) => u.code === 'kg')
-    const created = await expectOk(
-      '03b create ingredient',
-      rpc('upsert_ingredient', {
-        p_id: null,
-        p_name_ar: `مخزون-اختبار-${Date.now()}`,
-        p_name_en: null,
-        p_code: null,
-        p_base_uom_id: kg.id,
-        p_standard_cost: 1,
-        p_is_active: true,
-      }),
-    )
-    ingredientId = created?.id
-    uomId = kg.id
-  } else {
-    record('03b create ingredient', true, 'reused existing')
-  }
+  // Always create a fresh ingredient so prior receive (e.g. PURA) cannot skew on_hand asserts.
+  await expectOk('03 list_ingredients', rpc('list_ingredients', { p_active_only: true }))
+  const uoms = await rpc('rc_bootstrap_uoms')
+  const kg = (uoms.data ?? []).find((u) => u.code === 'kg')
+  const created = await expectOk(
+    '03b create ingredient',
+    rpc('upsert_ingredient', {
+      p_id: null,
+      p_name_ar: `مخزون-اختبار-${Date.now()}`,
+      p_name_en: null,
+      p_code: null,
+      p_base_uom_id: kg.id,
+      p_standard_cost: 1,
+      p_is_active: true,
+    }),
+  )
+  const ingredientId = created?.id
+  const uomId = kg.id
 
   const open = await expectOk(
     '04 opening movement',

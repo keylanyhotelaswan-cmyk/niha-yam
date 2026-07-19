@@ -12,6 +12,7 @@ export const shell = {
     reports: 'التقارير',
     recipes: 'الوصفات والتكلفة',
     inventory: 'المخزون',
+    purchasing: 'المشتريات',
     orderReview: 'طلبات تحتاج مراجعة',
     printCenter: 'مركز الطباعة',
     opsFeedback: 'مركز ملاحظات التشغيل',

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { SmartShiftSheet } from '@/features/treasury/components/SmartShiftSheet'
 import { ShiftSummary } from '@/features/treasury/components/ShiftSummary'
 import {
   useShiftArchive,
@@ -132,6 +133,7 @@ export function ShiftArchiveTab() {
           {detail.isLoading ? <LoadingState /> : null}
           {detail.data ? (
             <div className="space-y-6 text-sm">
+              {selectedId ? <SmartShiftSheet shiftId={selectedId} /> : null}
               {detail.data.report ? (
                 <ShiftSummary report={detail.data.report} showApprovalMetrics />
               ) : null}

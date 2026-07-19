@@ -26,4 +26,6 @@ export type StaffProfile = {
   display_name: string
   is_active: boolean
   branches: StaffBranchAssignment[]
+  /** Resolved: role default or explicit staff.can_print_manage */
+  can_print_manage?: boolean
 }

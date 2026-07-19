@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
+import { refuseProductionMutations } from './script-safety.mjs'
 
 /**
  * M6B — pairing, TTL, expired, Print Again, heartbeat, multi-printer recovery.
@@ -98,11 +99,12 @@ async function restorePrinterBindings(admin, backup) {
 }
 
 async function main() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anonKey = env.VITE_SUPABASE_ANON_KEY
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
-  assertSupabaseUrl(url)
+  assertTestingTarget(url)
+  refuseProductionMutations(url)
 
   const username = readArg('--username', 'abomalek').trim().toLowerCase()
   const password = readArg('--password', '741523')

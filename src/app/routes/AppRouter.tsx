@@ -8,6 +8,7 @@ import {
   GuestOnly,
   RequireAuth,
   RequireManager,
+  RequirePrintManage,
 } from '@/features/auth/guards/AuthGuards'
 import { t } from '@/shared/i18n'
 
@@ -52,6 +53,11 @@ const RecipesPage = lazy(() =>
 const InventoryPage = lazy(() =>
   import('@/features/inventory/pages/InventoryPage').then((m) => ({
     default: m.InventoryPage,
+  })),
+)
+const PurchasingPage = lazy(() =>
+  import('@/features/purchasing/pages/PurchasingPage').then((m) => ({
+    default: m.PurchasingPage,
   })),
 )
 const DashboardPage = lazy(() =>
@@ -149,18 +155,21 @@ export function AppRouter() {
                 path="/admin/change-password"
                 element={<ChangePasswordPage />}
               />
+              <Route element={<RequirePrintManage />}>
+                <Route path="/admin/print" element={<PrintCenterPage />} />
+              </Route>
               <Route element={<RequireManager />}>
                 <Route path="/admin/staff" element={<StaffListPage />} />
                 <Route path="/admin/menu" element={<MenuPage />} />
                 <Route path="/admin/recipes" element={<RecipesPage />} />
                 <Route path="/admin/inventory" element={<InventoryPage />} />
+                <Route path="/admin/purchasing" element={<PurchasingPage />} />
                 <Route path="/admin/treasury" element={<TreasuryPage />} />
                 <Route path="/admin/reports" element={<ReportsPage />} />
                 <Route
                   path="/admin/order-review"
                   element={<OrderReviewQueuePage />}
                 />
-                <Route path="/admin/print" element={<PrintCenterPage />} />
                 <Route
                   path="/admin/ops-feedback"
                   element={<OpsFeedbackAdminPage />}

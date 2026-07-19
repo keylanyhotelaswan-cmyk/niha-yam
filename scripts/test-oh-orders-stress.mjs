@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
+import { refuseProductionMutations } from './script-safety.mjs'
 
 /**
  * Operational Hardening — Orders stress (OH-2)
@@ -79,11 +80,12 @@ async function serviceCleanup(url, serviceKey) {
 }
 
 async function main() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anonKey = env.VITE_SUPABASE_ANON_KEY
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
-  assertSupabaseUrl(url)
+  assertTestingTarget(url)
+  refuseProductionMutations(url)
   if (!serviceKey) {
     console.error('Missing SUPABASE_SERVICE_ROLE_KEY')
     process.exit(1)

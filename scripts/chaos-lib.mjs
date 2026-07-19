@@ -1,8 +1,15 @@
 /**
- * Shared helpers for Production Chaos & Fuzz suites.
+ * Shared helpers for Chaos & Fuzz suites — Testing only (ADR-0035).
+ * Never mutate Production from smoke/test/chaos/fuzz scripts.
  */
-import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import {
+  assertTestingTarget,
+  loadTestingEnv,
+} from './load-env.mjs'
+import {
+  createScriptClient,
+  refuseProductionMutations,
+} from './script-safety.mjs'
 
 export const SEED_RESTAURANT_ID = 'a0000000-0000-4000-8000-000000000001'
 export const SEED_BRANCH_ID = 'b0000000-0000-4000-8000-000000000001'
@@ -54,19 +61,18 @@ export function createRecorder() {
 }
 
 export function loadEnvClients() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anon = env.VITE_SUPABASE_ANON_KEY
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
-  assertSupabaseUrl(url)
-  if (!anon || !serviceKey) throw new Error('Missing Supabase keys')
+  assertTestingTarget(url)
+  refuseProductionMutations(url)
+  if (!anon || !serviceKey) throw new Error('Missing Supabase keys in .env.testing')
   return { url, anon, serviceKey, env }
 }
 
 export async function signIn(url, anon, username, password) {
-  const client = createClient(url, anon, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const client = createScriptClient(url, anon, { mode: 'mutating' })
   const { error } = await client.auth.signInWithPassword({
     email: `${username}@${INTERNAL_EMAIL_DOMAIN}`,
     password,
@@ -99,9 +105,7 @@ export async function softReset(rpc) {
 }
 
 export async function serviceCleanup(url, serviceKey) {
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const admin = createScriptClient(url, serviceKey, { mode: 'mutating' })
   const r = SEED_RESTAURANT_ID
   const orderIds =
     (await admin.from('orders').select('id').eq('restaurant_id', r)).data?.map((x) => x.id) ?? []
@@ -256,9 +260,7 @@ export async function provisionEphemeralStaff({
   role,
   password = 'ChaosTest741!',
 }) {
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const admin = createScriptClient(url, serviceKey, { mode: 'mutating' })
   const username = `chaos_${role}_${Date.now().toString(36).slice(-6)}`
   const email = `${username}@${INTERNAL_EMAIL_DOMAIN}`
   const { data: created, error: cErr } = await admin.auth.admin.createUser({

@@ -3,14 +3,12 @@ import {
   useChooseCashierWindowsPrinter,
   useDiagnosePrintSystem,
   useEnqueueTestPrint,
-  useSetTestingPrintEnabled,
   useSyncPrintStationBindings,
 } from '@/features/print/hooks/usePrintMutations'
 import { usePrintOpsSettings } from '@/features/print/hooks/usePrintQueries'
 import type { PrintSystemDiagnosis, PrinterRow } from '@/features/print/types'
 import { Badge } from '@/shared/components/ui/badge'
 import { Button } from '@/shared/components/ui/button'
-import { Alert, AlertDescription, AlertTitle } from '@/shared/components/ui/alert'
 import {
   Card,
   CardContent,
@@ -27,7 +25,6 @@ import {
 } from '@/shared/components/ui/table'
 import { isTestingEnv } from '@/shared/config/appEnv'
 import { t } from '@/shared/i18n'
-import { AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
 
 type Props = {
@@ -59,7 +56,6 @@ export function DiagnosticsTab({ printers }: Props) {
   const sync = useSyncPrintStationBindings()
   const choose = useChooseCashierWindowsPrinter()
   const testPrint = useEnqueueTestPrint()
-  const setTestingPrint = useSetTestingPrintEnabled()
   const opsQuery = usePrintOpsSettings()
   const [result, setResult] = useState<PrintSystemDiagnosis | null>(null)
   const [picked, setPicked] = useState('')
@@ -155,27 +151,6 @@ export function DiagnosticsTab({ printers }: Props) {
     }
   }
 
-  const toggleTestingPrint = async (enabled: boolean) => {
-    if (enabled) {
-      const ok = window.confirm(t.print.diagnostics.testingPrintConfirmOn)
-      if (!ok) return
-    }
-    try {
-      await setTestingPrint.mutateAsync(enabled)
-      if (enabled) {
-        toast.warning(t.print.diagnostics.testingPrintToggledOn, {
-          duration: 8000,
-        })
-      } else {
-        toast.success(t.print.diagnostics.testingPrintToggledOff)
-      }
-      await opsQuery.refetch()
-      await runCheck()
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : t.print.errors.generic)
-    }
-  }
-
   return (
     <div className="space-y-6">
       <Card className="border-primary/30 bg-primary/5">
@@ -220,75 +195,6 @@ export function DiagnosticsTab({ printers }: Props) {
           </div>
         </CardHeader>
       </Card>
-
-      {testingUi ? (
-        <Card
-          className={
-            testingPrintArmed
-              ? 'border-2 border-red-600 bg-red-50/80 dark:bg-red-950/30'
-              : 'border-amber-500/40 bg-amber-500/5'
-          }
-        >
-          <CardHeader>
-            <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>{t.print.diagnostics.testingPrintTitle}</CardTitle>
-              <Badge variant={testingPrintArmed ? 'destructive' : 'secondary'}>
-                {testingPrintArmed
-                  ? t.print.diagnostics.testingPrintEnabled
-                  : t.print.diagnostics.testingPrintDisabled}
-              </Badge>
-            </div>
-            <p className="text-muted-foreground text-sm">
-              {t.print.diagnostics.testingPrintHint}
-            </p>
-            {!testingPrintArmed ? (
-              <p className="text-muted-foreground text-xs">
-                {t.print.diagnostics.testingPrintSafeHint}
-              </p>
-            ) : null}
-            <p className="text-muted-foreground text-xs">
-              {t.print.diagnostics.pairTestingHint}
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {testingPrintArmed ? (
-              <Alert className="border-red-600 bg-red-100/80 dark:bg-red-950/40">
-                <AlertTriangle className="size-4 text-red-700" />
-                <AlertTitle className="font-bold">
-                  {t.print.diagnostics.testingPrintArmedTitle}
-                </AlertTitle>
-                <AlertDescription>
-                  {t.print.diagnostics.testingPrintArmedBody}
-                </AlertDescription>
-              </Alert>
-            ) : null}
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="text-muted-foreground text-xs">
-                {t.print.diagnostics.envLabel}: {t.print.diagnostics.envTesting}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {testingPrintArmed ? (
-                  <Button
-                    variant="destructive"
-                    onClick={() => void toggleTestingPrint(false)}
-                    disabled={setTestingPrint.isPending}
-                  >
-                    {t.print.diagnostics.testingPrintOffNow}
-                  </Button>
-                ) : (
-                  <Button
-                    variant="outline"
-                    onClick={() => void toggleTestingPrint(true)}
-                    disabled={setTestingPrint.isPending}
-                  >
-                    {t.print.diagnostics.testingPrintOn}
-                  </Button>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
 
       {result ? (
         <>

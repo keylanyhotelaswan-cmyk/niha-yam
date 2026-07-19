@@ -76,6 +76,8 @@ export type PosContext = {
   can_discount: boolean
   /** Full discount capability (role default or per-staff override). */
   discount_permissions?: import('@/shared/access/discountPermissions').DiscountPermissionConfig | null
+  /** Independent operational goods-purchase capability (POS financial dialog). */
+  can_operational_purchase?: boolean
   can_open_shift: boolean
   can_close_shift?: boolean
   can_approve_collections?: boolean

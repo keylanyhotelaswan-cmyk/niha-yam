@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { AccessDeniedScreen } from '@/features/auth/components/AccessDeniedScreen'
+import { usePermissions } from '@/shared/access/permissions'
 import { useSession } from '@/shared/session/SessionProvider'
 import { t } from '@/shared/i18n'
 
@@ -33,6 +34,15 @@ export function RequireAuth() {
 export function RequireManager() {
   const { isManager } = useSession()
   if (!isManager) {
+    return <Navigate to="/admin" replace />
+  }
+  return <Outlet />
+}
+
+/** Print Center only — owner/manager or staff.can_print_manage. */
+export function RequirePrintManage() {
+  const { can } = usePermissions()
+  if (!can('print.manage')) {
     return <Navigate to="/admin" replace />
   }
   return <Outlet />

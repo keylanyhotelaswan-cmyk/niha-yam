@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
+import { refuseProductionMutations } from './script-safety.mjs'
 
 /**
  * Operational Stabilization regression suite.
@@ -23,10 +24,11 @@ function record(name, ok, detail = '') {
 }
 
 async function main() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anonKey = env.VITE_SUPABASE_ANON_KEY
-  assertSupabaseUrl(url)
+  assertTestingTarget(url)
+  refuseProductionMutations(url)
   if (!anonKey) throw new Error('Missing VITE_SUPABASE_ANON_KEY')
 
   const username = (readArg('--username', 'abomalek')).trim().toLowerCase()

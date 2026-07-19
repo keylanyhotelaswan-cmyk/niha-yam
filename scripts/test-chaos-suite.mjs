@@ -13,17 +13,18 @@ import {
   signIn,
   softReset,
 } from './chaos-lib.mjs'
+// Testing-only gate lives in chaos-lib.loadEnvClients (assertTestingTarget + refuseProductionMutations).
 
 /**
- * Production Chaos Suite — try to break ops (no new features).
+ * Chaos Suite — Testing only (ADR-0035). Never mutates Production.
  *
- *   pnpm test:chaos -- --username abomalek --password "SECRET"
+ *   pnpm test:chaos -- --username manager --password "Testing123!"
  */
 
 async function main() {
   const { url, anon, serviceKey } = loadEnvClients()
-  const username = readArg('--username', 'abomalek').trim().toLowerCase()
-  const password = readArg('--password', '741523')
+  const username = readArg('--username', 'manager').trim().toLowerCase()
+  const password = readArg('--password', 'Testing123!')
   const { record, expectOk, expectError, summary } = createRecorder()
 
   const owner = await signIn(url, anon, username, password)
@@ -32,7 +33,7 @@ async function main() {
   const actorUserId = userData?.user?.id
   if (!actorUserId) throw new Error('No actor user id')
 
-  console.log(`\nProduction Chaos Suite as ${username}…\n`)
+  console.log(`\n[Testing] Chaos Suite as ${username}…\n`)
 
   await softReset(rpc)
   await serviceCleanup(url, serviceKey)

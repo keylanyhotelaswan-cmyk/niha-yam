@@ -16,6 +16,11 @@ export const routeMeta: RouteMetaEntry[] = [
   { path: '/admin/menu', title: t.shell.nav.menu, parent: '/admin' },
   { path: '/admin/recipes', title: t.shell.nav.recipes, parent: '/admin' },
   { path: '/admin/inventory', title: t.shell.nav.inventory, parent: '/admin' },
+  {
+    path: '/admin/purchasing',
+    title: t.shell.nav.purchasing,
+    parent: '/admin',
+  },
   { path: '/admin/treasury', title: t.shell.nav.treasury, parent: '/admin' },
   { path: '/admin/reports', title: t.shell.nav.reports, parent: '/admin' },
   {

@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
+import { refuseProductionMutations } from './script-safety.mjs'
 
 /**
  * OES Shift Handover — SHA core paths under F1.
@@ -48,10 +49,11 @@ async function expectError(name, promise, code) {
 }
 
 async function main() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anon = env.VITE_SUPABASE_ANON_KEY
-  assertSupabaseUrl(url)
+  assertTestingTarget(url)
+  refuseProductionMutations(url)
   if (!anon) {
     console.error('Missing VITE_SUPABASE_ANON_KEY')
     process.exit(1)

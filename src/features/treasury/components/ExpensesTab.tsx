@@ -5,6 +5,10 @@ import { StatusBadge } from '@/features/treasury/components/StatusBadge'
 import { ExpenseDialog } from '@/features/treasury/components/dialogs/ExpenseDialog'
 import { ReasonDialog } from '@/features/treasury/components/dialogs/ReasonDialog'
 import {
+  isInsufficientOperatingError,
+  ReleaseReservedDialog,
+} from '@/features/treasury/components/dialogs/ReleaseReservedDialog'
+import {
   useApproveExpense,
   useRejectExpense,
   useReverseExpense,
@@ -35,6 +39,8 @@ export function ExpensesTab({ expenses, treasuries }: Props) {
   const [createOpen, setCreateOpen] = useState(false)
   const [reason, setReason] = useState<ReasonState>(null)
   const [reasonError, setReasonError] = useState<string | null>(null)
+  const [releaseOpen, setReleaseOpen] = useState(false)
+  const [releaseSuggest, setReleaseSuggest] = useState<number | null>(null)
 
   const approve = useApproveExpense()
   const reject = useRejectExpense()
@@ -46,9 +52,17 @@ export function ExpensesTab({ expenses, treasuries }: Props) {
   }, [treasuries])
 
   function onApprove(id: string) {
+    const row = expenses.find((e) => e.id === id)
     approve.mutate(id, {
       onSuccess: () => toast.success(t.treasury.lifecycle.approved),
-      onError: (e: Error) => toast.error(e.message),
+      onError: (e: Error) => {
+        if (isInsufficientOperatingError(e.message)) {
+          setReleaseSuggest(Number(row?.amount ?? 0) || null)
+          setReleaseOpen(true)
+          return
+        }
+        toast.error(e.message)
+      },
     })
   }
 
@@ -177,6 +191,11 @@ export function ExpensesTab({ expenses, treasuries }: Props) {
         submitError={reasonError}
         onConfirm={onConfirmReason}
         onOpenChange={(next) => !next && setReason(null)}
+      />
+      <ReleaseReservedDialog
+        open={releaseOpen}
+        onOpenChange={setReleaseOpen}
+        suggestedAmount={releaseSuggest}
       />
     </Card>
   )

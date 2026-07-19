@@ -45,6 +45,16 @@ function seedDiscountPerms(staff: StaffListItem, role: StaffRole): DiscountPermi
   )
 }
 
+function effectiveOpsPurchase(staff: StaffListItem, role: StaffRole): boolean {
+  if (staff.can_operational_purchase != null) return staff.can_operational_purchase
+  return role === 'owner' || role === 'manager'
+}
+
+function effectivePrintManage(staff: StaffListItem, role: StaffRole): boolean {
+  if (staff.can_print_manage != null) return staff.can_print_manage
+  return role === 'owner' || role === 'manager'
+}
+
 export function EditStaffDialog({
   staff,
   open,
@@ -65,6 +75,12 @@ export function EditStaffDialog({
     () => seedDiscountPerms(staff, currentRole),
   )
   const [discountTouched, setDiscountTouched] = useState(false)
+  const [opsPurchase, setOpsPurchase] = useState(() =>
+    effectiveOpsPurchase(staff, currentRole),
+  )
+  const [printManage, setPrintManage] = useState(() =>
+    effectivePrintManage(staff, currentRole),
+  )
 
   // Re-seed when the target staff row changes (dialog reused across rows).
   useEffect(() => {
@@ -72,8 +88,17 @@ export function EditStaffDialog({
     form.reset({ displayName: staff.display_name, role })
     setDiscountPerms(seedDiscountPerms(staff, role))
     setDiscountTouched(false)
+    setOpsPurchase(effectiveOpsPurchase(staff, role))
+    setPrintManage(effectivePrintManage(staff, role))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staff.id, staff.discount_permissions, staff.display_name, open])
+  }, [
+    staff.id,
+    staff.discount_permissions,
+    staff.can_operational_purchase,
+    staff.can_print_manage,
+    staff.display_name,
+    open,
+  ])
 
   // If role changes and user hasn't customized discount yet, show role defaults.
   useEffect(() => {
@@ -81,6 +106,17 @@ export function EditStaffDialog({
     if (staff.discount_permissions) return
     setDiscountPerms(DEFAULT_DISCOUNT_PERMISSIONS_BY_ROLE[watchedRole])
   }, [watchedRole, discountTouched, staff.discount_permissions])
+
+  // When role changes and no explicit column yet, follow role default for ops purchase.
+  useEffect(() => {
+    if (staff.can_operational_purchase != null) return
+    setOpsPurchase(watchedRole === 'owner' || watchedRole === 'manager')
+  }, [watchedRole, staff.can_operational_purchase])
+
+  useEffect(() => {
+    if (staff.can_print_manage != null) return
+    setPrintManage(watchedRole === 'owner' || watchedRole === 'manager')
+  }, [watchedRole, staff.can_print_manage])
 
   function onDiscountChange(next: DiscountPermissionConfig) {
     setDiscountTouched(true)
@@ -108,6 +144,10 @@ export function EditStaffDialog({
         branchId,
         role: values.role,
         discountPermissions: discountPermissionsToPayload(discountPerms),
+        canOperationalPurchase: opsPurchase,
+        setOperationalPurchase: true,
+        canPrintManage: printManage,
+        setPrintManage: true,
       },
       {
         onSuccess: () => {
@@ -182,6 +222,40 @@ export function EditStaffDialog({
             value={discountPerms}
             onChange={onDiscountChange}
           />
+
+          <div className="border-border space-y-2 rounded-md border p-3">
+            <p className="text-sm font-semibold">
+              {t.staff.form.opsPurchaseSection}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {t.staff.form.opsPurchaseHint}
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={opsPurchase}
+                onChange={(e) => setOpsPurchase(e.target.checked)}
+              />
+              {t.staff.form.opsPurchaseGrant}
+            </label>
+          </div>
+
+          <div className="border-border space-y-2 rounded-md border p-3">
+            <p className="text-sm font-semibold">
+              {t.staff.form.printManageSection}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              {t.staff.form.printManageHint}
+            </p>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={printManage}
+                onChange={(e) => setPrintManage(e.target.checked)}
+              />
+              {t.staff.form.printManageGrant}
+            </label>
+          </div>
 
           {branchesQuery.isError ? (
             <Alert variant="destructive">

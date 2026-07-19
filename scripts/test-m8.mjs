@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
-import { assertSupabaseUrl, loadProjectEnv } from './load-env.mjs'
+import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
+import { refuseProductionMutations } from './script-safety.mjs'
 
 /**
  * M8 — reports RPCs (M8A money + M8B ops: orders, delivery, items, print).
@@ -61,11 +62,12 @@ function cairoToday() {
 }
 
 async function main() {
-  const env = loadProjectEnv()
+  const env = loadTestingEnv()
   const url = env.VITE_SUPABASE_URL
   const anon = env.VITE_SUPABASE_ANON_KEY
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
-  assertSupabaseUrl(url)
+  assertTestingTarget(url)
+  refuseProductionMutations(url)
   if (!anon) {
     console.error('Missing VITE_SUPABASE_ANON_KEY')
     process.exit(1)

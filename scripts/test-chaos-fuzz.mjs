@@ -12,13 +12,12 @@ import {
   softReset,
   SEED_RESTAURANT_ID,
 } from './chaos-lib.mjs'
-import { createClient } from '@supabase/supabase-js'
+import { createScriptClient } from './script-safety.mjs'
 
 /**
- * Production Chaos — Random Fuzz + consistency (compressed long-run).
- * Generates hundreds of random ops then asserts DB invariants.
+ * Chaos Fuzz — Testing only (ADR-0035). Never mutates Production.
  *
- *   pnpm test:chaos-fuzz -- --username abomalek --password "SECRET" [--ops 300] [--seed 42]
+ *   pnpm test:chaos-fuzz -- --username manager --password "Testing123!" [--ops 300] [--seed 42]
  */
 
 function mulberry32(a) {
@@ -32,8 +31,8 @@ function mulberry32(a) {
 
 async function main() {
   const { url, anon, serviceKey } = loadEnvClients()
-  const username = readArg('--username', 'abomalek').trim().toLowerCase()
-  const password = readArg('--password', '741523')
+  const username = readArg('--username', 'manager').trim().toLowerCase()
+  const password = readArg('--password', 'Testing123!')
   const ops = Math.max(50, Number(readArg('--ops', '300')) || 300)
   const seed = Number(readArg('--seed', String(Date.now() % 1e9))) || 1
   const rand = mulberry32(seed)
@@ -42,11 +41,9 @@ async function main() {
 
   const owner = await signIn(url, anon, username, password)
   const rpc = rpcOf(owner)
-  const admin = createClient(url, serviceKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  })
+  const admin = createScriptClient(url, serviceKey, { mode: 'mutating' })
 
-  console.log(`\nChaos Fuzz ops=${ops} seed=${seed} as ${username}…\n`)
+  console.log(`\n[Testing] Chaos Fuzz ops=${ops} seed=${seed} as ${username}…\n`)
 
   await softReset(rpc)
   await serviceCleanup(url, serviceKey)

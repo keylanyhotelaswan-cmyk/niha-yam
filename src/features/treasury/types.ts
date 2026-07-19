@@ -28,6 +28,104 @@ export type TreasuryBalance = {
   movement_count: number
 }
 
+/** Administrative liquidity split on Main cash (not a new treasury). */
+export type LiquiditySnapshot = {
+  treasury_id: string | null
+  main_balance: number
+  operating_balance: number
+  reserved_balance: number
+  operating_pct: number
+  reserved_pct: number
+  currency_code: 'EGP'
+  note_ar: string
+}
+
+export type SmartShiftSheet = {
+  shift: {
+    id: string
+    reference: string
+    status: string
+    opened_at: string
+    closed_at: string | null
+    duration_minutes: number
+    opened_by_name?: string | null
+    closed_by_name?: string | null
+    actual_cash_count?: number | null
+    difference_reason?: string | null
+    notes?: string | null
+  }
+  report: Record<string, unknown>
+  collections: {
+    total_collected?: number
+    by_payment_method?: Array<{
+      payment_method_id?: string
+      name: string
+      amount: number
+    }>
+  }
+  handover: {
+    id: string
+    reference: string
+    kind: string
+    amount: number
+    status: string
+    review_status: string
+    review_notes?: string | null
+    reviewed_at?: string | null
+  } | null
+  expenses: Array<{
+    reference: string
+    amount: number
+    category: string
+    description?: string | null
+    vendor?: string | null
+    status: string
+    created_at?: string
+  }>
+  purchases: Array<{
+    reference: string
+    total_amount: number
+    payment_method: string
+    source_kind: string
+    direct_label?: string | null
+    supplier_name_ar?: string | null
+    status: string
+    lines?: Array<{
+      ingredient_name_ar: string
+      qty: number
+      unit_price: number
+      line_total: number
+    }>
+  }>
+  supplier_payments: Array<{
+    reference: string
+    amount: number
+    supplier_name_ar: string
+    status: string
+  }>
+  transfers: Array<{
+    reference: string
+    amount: number
+    is_cash_drop: boolean
+    reason?: string | null
+    status: string
+  }>
+  top_items: Array<{ name_ar: string; qty: number; sales: number }>
+  cancelled_orders: number
+  orders_count?: number
+  sales_total?: number
+  discounts_total: number
+  ops_summary?: {
+    income: number
+    expenses: number
+    purchases_cash: number
+    supplier_payments: number
+    transfers_out: number
+    drawer_remaining: number
+  }
+  summary_ar?: { title?: string; review_only_note?: string }
+}
+
 export type LedgerEntry = {
   id: string
   amount: number

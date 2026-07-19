@@ -11,6 +11,10 @@ export type StaffListItem = {
   branches: StaffBranchAssignment[]
   created_at: string
   discount_permissions?: import('@/shared/access/discountPermissions').DiscountPermissionConfig | null
+  /** NULL = role default. Explicit true/false from manager. */
+  can_operational_purchase?: boolean | null
+  /** NULL = role default. Explicit true/false — Print Center only. */
+  can_print_manage?: boolean | null
 }
 
 export type CreateStaffInput = {

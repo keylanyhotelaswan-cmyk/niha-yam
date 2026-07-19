@@ -15,6 +15,7 @@ import { print } from './ar/print'
 import { reports } from './ar/reports'
 import { recipes } from './ar/recipes'
 import { inventory } from './ar/inventory'
+import { purchasing } from './ar/purchasing'
 import { callCenter } from './ar/callCenter'
 import { opsMessages } from './ar/opsMessages'
 import { opsFeedback } from './ar/opsFeedback'
@@ -38,6 +39,7 @@ export const ar = {
   reports,
   recipes,
   inventory,
+  purchasing,
   callCenter,
   opsMessages,
   opsFeedback,

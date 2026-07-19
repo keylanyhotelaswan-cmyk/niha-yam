@@ -54,6 +54,14 @@ export const staff = {
     discountMaxPercent: 'الحد الأقصى للنسبة (%)',
     discountCanEdit: 'يستطيع تعديل الخصم',
     discountCanRemove: 'يستطيع إزالة الخصم',
+    opsPurchaseSection: 'شراء بضاعة تشغيلي',
+    opsPurchaseHint:
+      'يسمح بتسجيل شراء بضاعة من أدوات التشغيل دون صلاحيات إدارة الموردين. مستقل عن دور المشتريات الإدارية.',
+    opsPurchaseGrant: 'السماح بشراء بضاعة من التشغيل',
+    printManageSection: 'إدارة الطباعة',
+    printManageHint:
+      'يسمح بالدخول إلى مركز الطباعة والتشخيص وربط الطابعة واختبار الطباعة فقط — دون أي صلاحيات إدارية أخرى.',
+    printManageGrant: 'السماح بإدارة الطباعة',
   },
   password: {
     title: 'تغيير كلمة المرور',

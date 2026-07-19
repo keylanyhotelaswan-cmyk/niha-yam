@@ -65,6 +65,25 @@ export function assertTestingTarget(url, label = 'VITE_SUPABASE_URL') {
   }
 }
 
+/** Assert URL is Production (for read-only Production smokes only). */
+export function assertProductionTarget(url, label = 'VITE_SUPABASE_URL') {
+  assertSupabaseUrl(url, label)
+  let host
+  try {
+    host = new URL(url).hostname
+  } catch {
+    throw new Error(`Invalid ${label}`)
+  }
+  if (!host.startsWith(`${PRODUCTION_SUPABASE_REF}.`)) {
+    throw new Error(
+      `Refusing: ${label} is not Production (${PRODUCTION_SUPABASE_REF}). Got ${host}`,
+    )
+  }
+  if (host.includes(TESTING_SUPABASE_REF)) {
+    throw new Error(`Refusing: ${label} points at Testing.`)
+  }
+}
+
 const SUPABASE_URL_PATTERN = /^https?:\/\/[^/\s]+/i
 
 export function assertSupabaseUrl(url, label = 'VITE_SUPABASE_URL') {

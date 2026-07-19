@@ -10,9 +10,10 @@
 **Project status:** [PROJECT_STATUS.md](../PROJECT_STATUS.md) — `Current Phase: Suppliers & Purchasing`  
 **Methodology:** Plan → Review → Approve → Implement → Test → Final Review → Feature Freeze
 
-> **Plan Approved. Implement is gated:** next step is an explicit **PURA kickoff** on **Testing** only.  
-> All existing Feature Freezes remain in force (POS · Orders · Printing · Treasury · Reports · Shifts · Recipes · Inventory INVA · Shift Handover · Ops).  
-> **Deploy rule:** anything new → Testing first → Production after verification. Do not open POS except for real bugs.
+> **Plan Approved · PURA ✅ Production** · [purchasing-final-review-pura.md](./purchasing-final-review-pura.md)  
+> **PURB:** [plan](./purchasing-purb-plan.md) ✅ · [Final Review](./purchasing-final-review-purb.md) ✅ **Production + Feature Freeze** (2026-07-16).  
+> **PURC** = next slice (prereqs Liquidity + Smart Handover ✅). Awaiting explicit kickoff.  
+> All existing Feature Freezes remain in force. **Deploy rule:** Testing first → Production after verification.
 
 ---
 
@@ -25,8 +26,10 @@
 | **Vision §4.3 / V-A7…V-A13** | ✅ Locked — not reopened |
 | **Slice order** | PURA → PURB → PURC |
 | **Q-PUR1…Q-PUR8** | ✅ Locked (table §6) |
-| **First Implement** | **PURA** on Testing only — separate kickoff request |
-| **Production** | After PURA verification on Testing |
+| **First Implement** | **PURA** — ✅ Testing · ✅ **Production** (2026-07-15) |
+| **Production** | ✅ Promoted |
+| **PURB** | ✅ Production + Feature Freeze — [purchasing-final-review-purb.md](./purchasing-final-review-purb.md) |
+| **PURC** | ▶️ Next — awaiting kickoff |
 
 ---
 
@@ -169,7 +172,10 @@ Former open questions — **resolved**:
 | ---- | ----- |
 | Vision §4.3 | ✅ Locked |
 | **This Plan** | ✅ **Approved** (2026-07-15) |
-| Implement | ⏸ **Blocked until explicit PURA kickoff** (Testing first) |
+| Implement **PURA** | ✅ Testing · ✅ **Production** (2026-07-15) · [final review](./purchasing-final-review-pura.md) |
+| Implement **PURB** | ✅ Production + Feature Freeze (2026-07-16) |
+| Implement **PURC** | ▶️ Ready for kickoff (السيولة + استلام الوردية ✅) |
+| Production promote | ✅ Done |
 | Operational Baseline v1.1 | ✅ Defined — [release-operational-v1.1.md](./release-operational-v1.1.md) |
 | Project status | [PROJECT_STATUS.md](../PROJECT_STATUS.md) |
 
@@ -181,3 +187,7 @@ Former open questions — **resolved**:
 | ------- | ---- | ----- |
 | 0.1 | 2026-07-13 | Kickoff draft after Operational Freeze / Baseline v1.1 |
 | **1.0** | **2026-07-15** | **Approved** — § review · Q-PUR1…Q-PUR8 locked · PURA first on Testing · freezes intact |
+| **1.1** | **2026-07-15** | PURA Implemented + Final Review on Testing · Production promote gated |
+| **1.2** | **2026-07-15** | PURA promoted to Production (migrate + deploy + smoke) · PURB/PURC still blocked |
+| **1.3** | **2026-07-16** | PURB Production + Feature Freeze · next liquidity → smart handover · PURC still blocked |
+| **1.4** | **2026-07-18** | Liquidity + Smart Handover done · Printing Feature Freeze closed · **PURC** is next (kickoff pending) |
