@@ -351,6 +351,8 @@ export const treasury = {
     NO_OPEN_SHIFT: 'لا توجد وردية مفتوحة.',
     NO_CASH_DRAWER: 'لا يوجد درج كاشير معرّف.',
     NO_CASH_SAFE: 'لا توجد خزنة رئيسية لاستقبال النقد.',
+    MAIN_CASH_REQUIRED:
+      'لا يمكن إيقاف الخزنة الرئيسية — مطلوبة لتسليم الوردية وتحويل النقد.',
     SAME_TREASURY: 'لا يمكن التحويل إلى نفس الخزنة.',
     DIFFERENCE_REASON_REQUIRED: 'سبب الفرق مطلوب.',
     REASON_REQUIRED: 'السبب مطلوب.',

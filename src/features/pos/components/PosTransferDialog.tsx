@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
   Dialog,
@@ -14,8 +14,6 @@ import { Label } from '@/shared/components/ui/label'
 import { Alert, AlertDescription } from '@/shared/components/ui/alert'
 import { posOperationalTransfer } from '@/features/pos/api/pos.api'
 import { formatMoney, formatDateTime } from '@/features/treasury/utils/format'
-import { ReasonDialog } from '@/features/treasury/components/dialogs/ReasonDialog'
-import { useRejectTransfer } from '@/features/treasury/hooks/useTreasuryMutations'
 import type { PosOperationalTreasury } from '@/features/pos/types'
 import {
   shouldResetTransferForm,
@@ -27,8 +25,6 @@ import {
   type TransferReasonPreset,
 } from '@/features/pos/utils/saleMoney'
 import { supabase } from '@/lib/supabase/client'
-import { usePermissions } from '@/shared/access/permissions'
-import { posKeys } from '@/features/pos/hooks/pos.keys'
 import { t } from '@/shared/i18n'
 
 type Props = {
@@ -42,7 +38,6 @@ type TransferLogRow = {
   id: string
   amount: number
   reason: string | null
-  status: string
   created_at: string
   source_name: string
   dest_name: string
@@ -55,10 +50,6 @@ export function PosTransferDialog({
   treasuries,
   shiftId,
 }: Props) {
-  const { can } = usePermissions()
-  const canReject = can('treasury.manage')
-  const queryClient = useQueryClient()
-  const rejectTransfer = useRejectTransfer()
   const [sourceId, setSourceId] = useState('')
   const [destId, setDestId] = useState('')
   const [amount, setAmount] = useState('')
@@ -66,8 +57,6 @@ export function PosTransferDialog({
   const [reasonOther, setReasonOther] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [rejectId, setRejectId] = useState<string | null>(null)
-  const [rejectError, setRejectError] = useState<string | null>(null)
   const wasOpenRef = useRef(false)
 
   const drawer = useMemo(
@@ -86,7 +75,7 @@ export function PosTransferDialog({
       const { data, error: qErr } = await supabase
         .from('treasury_transfers')
         .select(
-          'id, amount, reason, status, created_at, source_treasury_id, dest_treasury_id, created_by',
+          'id, amount, reason, created_at, source_treasury_id, dest_treasury_id, created_by',
         )
         .eq('shift_id', shiftId!)
         .eq('auto_approved', true)
@@ -122,7 +111,6 @@ export function PosTransferDialog({
         id: r.id,
         amount: Number(r.amount),
         reason: r.reason,
-        status: r.status,
         created_at: r.created_at,
         source_name: tresMap.get(r.source_treasury_id) ?? '—',
         dest_name: tresMap.get(r.dest_treasury_id) ?? '—',
@@ -306,34 +294,13 @@ export function PosTransferDialog({
                       key={row.id}
                       className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] p-2"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="font-semibold text-[#0f172a]">
-                            {row.source_name} → {row.dest_name} ·{' '}
-                            <span dir="ltr">{formatMoney(row.amount)}</span>
-                          </div>
-                          <div className="text-[#64748b]">
-                            {row.reason || '—'} · {row.user_name} ·{' '}
-                            {formatDateTime(row.created_at)}
-                            {row.status === 'reversed'
-                              ? ` · ${t.treasury.status.reversed}`
-                              : ''}
-                          </div>
-                        </div>
-                        {canReject && row.status === 'executed' ? (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="h-7 shrink-0 px-2 text-[11px] text-destructive border-destructive/40"
-                            onClick={() => {
-                              setRejectError(null)
-                              setRejectId(row.id)
-                            }}
-                          >
-                            {t.treasury.lifecycle.reject}
-                          </Button>
-                        ) : null}
+                      <div className="font-semibold text-[#0f172a]">
+                        {row.source_name} → {row.dest_name} ·{' '}
+                        <span dir="ltr">{formatMoney(row.amount)}</span>
+                      </div>
+                      <div className="text-[#64748b]">
+                        {row.reason || '—'} · {row.user_name} ·{' '}
+                        {formatDateTime(row.created_at)}
                       </div>
                     </li>
                   ))}
@@ -350,31 +317,6 @@ export function PosTransferDialog({
             {t.common.confirm}
           </Button>
         </DialogFooter>
-        <ReasonDialog
-          open={rejectId !== null}
-          title={t.treasury.lifecycle.rejectTitle}
-          hint={t.treasury.lifecycle.rejectHint}
-          confirmLabel={t.treasury.lifecycle.reject}
-          destructive
-          pending={rejectTransfer.isPending}
-          submitError={rejectError}
-          onConfirm={(reason) => {
-            if (!rejectId) return
-            rejectTransfer.mutate(
-              { id: rejectId, reason },
-              {
-                onSuccess: () => {
-                  toast.success(t.treasury.lifecycle.rejected)
-                  setRejectId(null)
-                  void logQuery.refetch()
-                  void queryClient.invalidateQueries({ queryKey: posKeys.context() })
-                },
-                onError: (e: Error) => setRejectError(e.message),
-              },
-            )
-          }}
-          onOpenChange={(next) => !next && setRejectId(null)}
-        />
       </DialogContent>
     </Dialog>
   )
