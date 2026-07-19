@@ -70,23 +70,28 @@ export function ShiftSummary({
 
   const pendingExpenses = Number(report.pending_expenses_amount ?? 0)
 
-  const expectedCash = showApprovalMetrics
-    ? Number(report.expected_cash ?? 0)
-    : paymentMethodTotals != null || trustCashTotal != null
-      ? Number(report.opening_balance ?? 0) +
-        Number(report.opening_float ?? 0) +
-        cashSales -
-        Number(report.cash_drops ?? 0) -
-        Number(report.expenses ?? 0) -
-        pendingExpenses
-      : report.operational_drawer_balance != null
-        ? Number(report.operational_drawer_balance)
-        : Number(report.expected_cash ?? 0)
+  // Shift-only expected: never add treasury-derived opening_balance (carried vault).
+  const shiftOnlyExpected =
+    Number(report.opening_float ?? 0) +
+    cashSales -
+    Number(report.cash_drops ?? 0) -
+    Number(report.expenses ?? 0) -
+    pendingExpenses +
+    Number(report.transfers_in ?? 0) +
+    Number(report.deposits ?? 0) -
+    Number(report.withdrawals ?? 0) +
+    Number(report.refunds ?? 0)
+
+  const expectedCash =
+    report.operational_drawer_balance != null
+      ? Number(report.operational_drawer_balance)
+      : showApprovalMetrics
+        ? Number(report.expected_cash ?? 0)
+        : paymentMethodTotals != null || trustCashTotal != null
+          ? shiftOnlyExpected
+          : Number(report.expected_cash ?? 0)
 
   const rows: Row[] = [
-    ...(Math.abs(report.opening_balance) > 0.001
-      ? [{ label: t.treasury.shift.carriedOver, value: report.opening_balance }]
-      : []),
     { label: t.treasury.shift.openingFloat, value: report.opening_float },
     { label: t.treasury.shift.cashSales, value: cashSales, tone: 'in' },
     { label: t.treasury.shift.cashDrops, value: -report.cash_drops, tone: 'out' },

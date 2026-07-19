@@ -157,6 +157,8 @@ export type ShiftReport = {
   transfers_in: number
   expected_cash: number
   variance: number
+  /** Cumulative physical drawer (for close-count). Open-shift KPIs use operational_drawer_balance. */
+  physical_drawer_balance?: number | null
   operational_drawer_balance?: number | null
   approved_revenue?: number
   pending_collections_count?: number

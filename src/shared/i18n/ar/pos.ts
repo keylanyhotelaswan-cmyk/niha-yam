@@ -180,7 +180,7 @@ export const pos = {
       ready: 'جاهز',
     },
     money: {
-      netCash: 'نقدي صافي',
+      netCash: 'نقدي الوردية',
       collected: 'محصل',
       uncollected: 'غير محصل',
     },

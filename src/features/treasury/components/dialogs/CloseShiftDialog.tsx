@@ -56,7 +56,10 @@ export function CloseShiftDialog({
   showApprovalStep = true,
 }: Props) {
   const queryClient = useQueryClient()
-  const expectedCash = shift?.expected_cash ?? 0
+  // Close count reconciles physical cash in the drawer, not shift-only KPIs.
+  const expectedCash = Number(
+    shift?.physical_drawer_balance ?? shift?.expected_cash ?? 0,
+  )
   const pendingSummary = parsePendingSummary(shift as Record<string, unknown> | null)
   const expenseSummary = parsePendingExpensesSummary(
     shift as Record<string, unknown> | null,

@@ -296,7 +296,7 @@ export function PosPage() {
     allowDayScope: allowDayTotals,
   })
 
-  /** Hub strips: cash = drawer balance (sales − transfers − expenses); digital = operational treasuries. */
+  /** Hub strips: cash = current-shift drawer ops; digital = operational treasuries. */
   const paymentStripRows = useMemo(() => {
     const rows: Array<{
       payment_method_id?: string
@@ -308,11 +308,12 @@ export function PosPage() {
     const drawerTreasury = (ctx?.operational_treasuries ?? []).find(
       (tr) => tr.code === 'drawer',
     )
+    // Prefer explicit shift-scoped field; treasury.balance is also shift-scoped from get_pos_context.
     const drawerBalance =
-      drawerTreasury != null
-        ? Number(drawerTreasury.balance ?? 0)
-        : ctx?.operational_drawer_balance != null
-          ? Number(ctx.operational_drawer_balance)
+      ctx?.operational_drawer_balance != null
+        ? Number(ctx.operational_drawer_balance)
+        : drawerTreasury != null
+          ? Number(drawerTreasury.balance ?? 0)
           : null
 
     if (drawerBalance != null) {
@@ -358,19 +359,20 @@ export function PosPage() {
   ])
 
   const netCashAmount = useMemo(() => {
+    // Current shift only — never fall back to cumulative vault balance first.
+    if (ctx?.operational_drawer_balance != null) {
+      return Number(ctx.operational_drawer_balance)
+    }
     const drawerTreasury = (ctx?.operational_treasuries ?? []).find(
       (tr) => tr.code === 'drawer',
     )
     if (drawerTreasury != null) return Number(drawerTreasury.balance ?? 0)
-    if (ctx?.operational_drawer_balance != null) {
-      return Number(ctx.operational_drawer_balance)
-    }
     return (
       collectionPaymentTotals.find((r) => r.code === 'cash')?.amount ?? 0
     )
   }, [
-    ctx?.operational_treasuries,
     ctx?.operational_drawer_balance,
+    ctx?.operational_treasuries,
     collectionPaymentTotals,
   ])
 
