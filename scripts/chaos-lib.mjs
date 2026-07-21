@@ -159,11 +159,12 @@ export async function assertDbConsistency(admin, record, label = 'consistency') 
   const orphanShift = (ords ?? []).filter((o) => !o.shift_id)
   record(`${label}: orders have shift_id`, orphanShift.length === 0, `${orphanShift.length}`)
 
-  const refs = (ords ?? []).map((o) => o.reference)
+  // Refs reset per open shift (1, 2, 3…); uniqueness is (shift_id, reference).
+  const refKeys = (ords ?? []).map((o) => `${o.shift_id}:${o.reference}`)
   record(
     `${label}: unique order refs`,
-    new Set(refs).size === refs.length,
-    `${refs.length}`,
+    new Set(refKeys).size === refKeys.length,
+    `${refKeys.length}`,
   )
 
   const { data: hos } = await admin
