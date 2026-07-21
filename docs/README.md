@@ -11,6 +11,8 @@ and design decisions. It is maintained **docs-first**: every material decision i
 
 | Document                                               | Purpose                                                                           |
 | ------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| [testing-environment.md](./testing-environment.md)     | إعداد بيئة Testing (محلي)                                                       |
+| [deployment-workflow.md](./deployment-workflow.md)     | **Testing → Production** release gate · تقرير كل إصدار · [ADR-0036](./adr/0036-testing-first-deployment-workflow.md) |
 | [architecture.md](./architecture.md)                   | System architecture: layers, folders, data flow, state, errors, security, secrets |
 | [domain-model.md](./domain-model.md)                   | Entities, relationships, invariants, ER diagram                                   |
 | [workflows.md](./workflows.md)                         | Business workflows — implemented now + designed for later                         |

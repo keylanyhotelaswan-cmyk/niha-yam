@@ -6,20 +6,29 @@
 
 | الطبقة | Production | Testing |
 | --- | --- | --- |
-| **Migrations** (`supabase/migrations/`) | ✅ تُطبَّق | ✅ تُطبَّق |
-| **Edge Functions** | ✅ تُنشَر | ✅ تُنشَر |
-| **Schema / RPC / RLS / Buckets** | متطابق | متطابق |
+| **Migrations** (`supabase/migrations/`) | ✅ عند **بوابة الإصدار فقط** | ✅ أثناء التطوير |
+| **Edge Functions** | ✅ مع الإصدار | ✅ مع Testing |
+| **Schema / RPC / RLS / Buckets** | متطابق **بعد** الإصدار المعتمد | بيئة البناء والاختبار |
 | **Seed والبيانات التجريبية** | ❌ ممنوع | ✅ فقط |
-| **طلبات / خزن / تقارير حقيقية** | تشغيل فعلي | بيانات تجريبية منفصلة |
+| **طلبات / خزن / تقارير حقيقية** | تشغيل فعلي فقط | اختبار وظيفي/مالي هنا |
 
-بعد أي migration جديدة في المستودع شغّل:
+**النشر الرسمي:** [`deployment-workflow.md`](./deployment-workflow.md) · [ADR-0036](./adr/0036-testing-first-deployment-workflow.md)
+
+أثناء التطوير — بعد أي migration جديدة:
 
 ```bash
-pnpm migrate:schema
+pnpm migrate:testing
 ```
 
-هذا يطبّق نفس الـ Migrations على **Production ثم Testing** حتى يبقى الـ Schema متطابقًا.  
-الـ Seed لا يُنفَّذ ضمن هذا الأمر أبدًا.
+**لا** تشغّل `migrate:production` / `migrate:schema` إلا بعد موافقة المالك على Testing، ثم:
+
+```bash
+NIHA_RELEASE_MIGRATE=1 pnpm migrate:production
+# أو لمزامنة الاثنين مع المستودع عند الإصدار:
+NIHA_RELEASE_MIGRATE=1 pnpm migrate:schema
+```
+
+الـ Seed لا يُنفَّذ ضمن أوامر الـ migrate أبدًا.
 
 | | Production | Testing |
 | --- | --- | --- |
@@ -50,17 +59,19 @@ pnpm env:testing
 
 بديل يدوي: انسخ `.env.testing.example` → `.env.testing`.
 
-### مزامنة الـ Schema لأول مرة
+### مزامنة الـ Schema لأول مرة / عند الإصدار
 
 ```bash
-pnpm migrate:schema
+pnpm migrate:testing
+# بعد موافقة المالك فقط:
+NIHA_RELEASE_MIGRATE=1 pnpm migrate:schema
 ```
 
-أو كل هدف على حدة:
+أهداف منفصلة:
 
 ```bash
-pnpm migrate:production   # Production فقط
-pnpm migrate:testing      # Testing فقط
+pnpm migrate:testing                              # التطوير اليومي
+NIHA_RELEASE_MIGRATE=1 pnpm migrate:production    # بوابة الإصدار فقط
 ```
 
 ### بيانات تجريبية (Testing فقط)
@@ -111,17 +122,25 @@ pnpm dev:testing
 
 ## 3) تحديث Migrations لاحقًا
 
-بعد إضافة ملف تحت `supabase/migrations/`:
+بعد إضافة ملف تحت `supabase/migrations/` أثناء التطوير:
 
 ```bash
-pnpm migrate:schema
+pnpm migrate:testing
+```
+
+عند **بوابة الإصدار** (بعد موافقة Testing) — انظر [`deployment-workflow.md`](./deployment-workflow.md):
+
+```bash
+NIHA_RELEASE_MIGRATE=1 pnpm migrate:production
 ```
 
 | الأمر | ماذا يفعل |
 | --- | --- |
-| `pnpm migrate:schema` | Production + Testing (موصى به) |
-| `pnpm migrate:production` | Production فقط |
-| `pnpm migrate:testing` | Testing فقط + يستعيد رابط CLI للإنتاج |
+| `pnpm migrate:testing` | Testing فقط — **المسار اليومي** |
+| `NIHA_RELEASE_MIGRATE=1 pnpm migrate:production` | Production بعد موافقة المالك |
+| `NIHA_RELEASE_MIGRATE=1 pnpm migrate:schema` | Production ثم Testing عند الإصدار |
+
+بدون `NIHA_RELEASE_MIGRATE=1` ترفض سكربتات Production migrate التنفيذ (ADR-0036).
 
 لا تشغّل `pnpm seed:testing` على Production — السكربت محمي ويرفض عنوان Production.
 
@@ -158,9 +177,9 @@ pnpm migrate:schema
 | الأمر | الوظيفة |
 | --- | --- |
 | `pnpm env:testing` | توليد/تحديث `.env.testing` |
-| `pnpm migrate:schema` | Migrations + Functions → **Production و Testing** |
-| `pnpm migrate:production` | Migrations + Functions → Production |
-| `pnpm migrate:testing` | Migrations + Functions → Testing |
+| `pnpm migrate:testing` | Migrations + Functions → Testing (يومي) |
+| `NIHA_RELEASE_MIGRATE=1 pnpm migrate:production` | → Production (بوابة إصدار) |
+| `NIHA_RELEASE_MIGRATE=1 pnpm migrate:schema` | → Production ثم Testing (إصدار) |
 | `pnpm seed:testing` | بيانات تجريبية (**Testing فقط**) |
 | `pnpm dev:testing` | تشغيل الواجهة على Testing |
 

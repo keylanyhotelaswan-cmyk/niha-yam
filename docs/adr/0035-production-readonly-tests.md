@@ -71,5 +71,5 @@ This must never be the default in CI or agent runs.
 ## Consequences
 
 - Production smokes no longer prove full money paths; those stay on Testing.
-- Safer promote workflow: migrate/deploy Production, then read-only smoke + human check.
+- Safer promote workflow: Testing sign-off → migrate/deploy Production → read-only health check ([ADR-0036](./0036-testing-first-deployment-workflow.md)).
 - Agents and CI cannot accidentally close live shifts again via named test scripts.

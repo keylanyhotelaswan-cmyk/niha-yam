@@ -2,7 +2,10 @@
  * Apply all repo migrations to the Production Supabase project.
  * Does NOT run seed. Seed is Testing-only.
  *
- * Usage: pnpm migrate:production
+ * Release Gate (ADR-0036): requires owner approval after Testing sign-off.
+ * Usage: NIHA_RELEASE_MIGRATE=1 pnpm migrate:production
+ *
+ * During development use: pnpm migrate:testing
  */
 import { spawnSync } from 'node:child_process'
 import {
@@ -31,6 +34,18 @@ function run(cmd, args) {
 }
 
 function main() {
+  if (process.env.NIHA_RELEASE_MIGRATE !== '1') {
+    console.error(
+      'REFUSED: Production migrate requires Release Gate (ADR-0036).\n' +
+        '  After owner approval on Testing, run:\n' +
+        '    NIHA_RELEASE_MIGRATE=1 pnpm migrate:production\n' +
+        '  During development use:\n' +
+        '    pnpm migrate:testing\n' +
+        '  See docs/deployment-workflow.md',
+    )
+    process.exit(1)
+  }
+
   mkdirSync(dirname(PROJECT_REF_PATH), { recursive: true })
   const previous = existsSync(PROJECT_REF_PATH)
     ? readFileSync(PROJECT_REF_PATH, 'utf8').trim()

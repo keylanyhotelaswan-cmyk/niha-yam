@@ -1,0 +1,13 @@
+---
+description: Testing-first release — never treat Production as a test env; migrate Prod only after owner approval
+alwaysApply: true
+---
+
+# Deployment workflow (ADR-0036)
+
+- **Testing only** for features, migrations during build, and all functional/financial tests (orders, payments, reopen, reversal, treasury).
+- **Production = operations only.** No financial smoke. No test orders/payments/reopen/reversal on Production. Health/read checks only (ADR-0035).
+- During development: `pnpm migrate:testing` only. Do **not** run `migrate:production` / `migrate:schema` without explicit owner approval.
+- After Testing approval (Release Gate), order is fixed: (1) `NIHA_RELEASE_MIGRATE=1 pnpm migrate:production` (2) confirm Production app deploy (3) Health Check only (4) write Release Report.
+- Migration-dependent UI is **not Production-ready** until that migration is on Production. Avoid landing such UI on `main` before the gate (`main` auto-deploys Vercel Production).
+- Every release report: commit hash, migrations applied on Production, Testing↔Production schema + app version sync. Template: `docs/deployment-workflow.md`.

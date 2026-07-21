@@ -1,9 +1,19 @@
 # NIHA ERP — Project Status
 
-**Last updated:** 2026-07-19  
+**Last updated:** 2026-07-21  
 **App baseline:** 1.1.0 · Operational release `v1.1.0-production`  
 **Print Bridge baseline:** **0.5.0** (dual-env reference) · approved package track **0.5.3+** · current **0.5.8** (portable printer ownership + updater PID wait + single-instance) · print architecture freeze: hotfixes only  
 **This file is the official at-a-glance project status.** Detailed module history lives in [`docs/modules.md`](./docs/modules.md).
+
+### سياسة النشر (ثابتة) — ADR-0036
+
+| البيئة | الدور |
+| --- | --- |
+| **Testing** | التطوير والاختبار **فقط** — كل Features و Migrations والاختبارات الوظيفية/المالية |
+| **Production** | التشغيل الفعلي **فقط** — ممنوع Smoke مالي أو معاملات اختبار |
+
+**بوابة الإصدار (بعد موافقة Testing):** Migrations على Production → نشر التطبيق → Health Check فقط → تقرير Release.  
+التفاصيل والقالب: [`docs/deployment-workflow.md`](./docs/deployment-workflow.md) · [ADR-0036](./docs/adr/0036-testing-first-deployment-workflow.md).
 
 ### الطباعة — Feature Freeze (مغلق)
 
@@ -101,7 +111,8 @@ Current Phase: Suppliers & Purchasing
 | هل نلمس الطباعة بميزات جديدة؟ | لا — Feature Freeze · Hotfix فقط |
 | هل نلمس POS/خزنة بميزات جديدة؟ | لا — Freeze |
 | أين التفاصيل التاريخية؟ | [`docs/modules.md`](./docs/modules.md) وملفات Final Review في `docs/` |
-| أين تختبر؟ | Testing أولًا — [`docs/testing-environment.md`](./docs/testing-environment.md) |
+| أين تختبر؟ | Testing فقط — [`docs/deployment-workflow.md`](./docs/deployment-workflow.md) · [`docs/testing-environment.md`](./docs/testing-environment.md) |
+| كيف تُنشر؟ | موافقة Testing → migrate Production → deploy → Health Check — [ADR-0036](./docs/adr/0036-testing-first-deployment-workflow.md) |
 
 ---
 
