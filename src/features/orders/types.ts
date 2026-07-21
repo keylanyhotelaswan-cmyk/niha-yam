@@ -36,6 +36,10 @@ export type OrderListItem = {
   customer_name: string | null
   pending_collections: number
   payment_breakdown?: PaymentBreakdownRow[]
+  cancel_reason?: string | null
+  cancelled_at?: string | null
+  cancelled_by_name?: string | null
+  reversed_collections_count?: number
 }
 
 export type OrderMoney = {
@@ -73,6 +77,7 @@ export type OrderCollection = {
   created_at: string
   approved_at: string | null
   rejection_reason: string | null
+  reversal_reason?: string | null
 }
 
 export type OrderDetail = {
@@ -113,6 +118,9 @@ export type OrderDetail = {
     requires_review?: boolean
     review_reason?: string | null
     can_free_edit?: boolean
+    cancel_reason?: string | null
+    cancelled_at?: string | null
+    cancelled_by_name?: string | null
   }
   money?: OrderMoney
   items: Array<{

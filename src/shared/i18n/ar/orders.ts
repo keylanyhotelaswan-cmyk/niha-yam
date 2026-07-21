@@ -65,8 +65,14 @@ export const orders = {
       delivery: 'دليفري',
       takeaway: 'استلام',
       ready: 'جاهز',
-      cancelled: 'ملغاة',
+      cancelled: 'الفواتير الملغاة',
       customers: 'عملاء اليوم',
+    },
+    cancelArchive: {
+      reason: 'سبب الإلغاء',
+      by: 'أُلغي بواسطة',
+      at: 'وقت الإلغاء',
+      reversals: 'عمليات عكسية مرتبطة',
     },
     identity: {
       title: 'هوية الطلب',
@@ -76,6 +82,9 @@ export const orders = {
       lastEditedAt: 'وقت آخر تعديل',
       collectedBy: 'حصّل بواسطة',
       collectedAt: 'وقت التحصيل',
+      cancelledBy: 'أُلغي بواسطة',
+      cancelledAt: 'وقت الإلغاء',
+      cancelReason: 'سبب الإلغاء',
       none: '—',
     },
   },
@@ -227,5 +236,6 @@ export const orders = {
     CANCEL_BLOCKED_IN_PROGRESS:
       'لا يمكن إلغاء الطلب لأنه دخل التنفيذ/أُرسل للمطبخ.',
     CANCEL_BLOCKED_DELIVERED: 'لا يمكن إلغاء الطلب بعد التسليم.',
+    ORDER_CANCELLED: 'لا يمكن تسجيل تحصيل على فاتورة ملغاة.',
   },
 } as const

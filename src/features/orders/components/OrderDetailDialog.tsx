@@ -84,7 +84,8 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
     ? detail.order.can_free_edit !== false &&
       !detail.money?.has_approved_collection
     : false
-  const canCollect = remaining > 0.001
+  const canCollect =
+    remaining > 0.001 && detail?.order.fulfillment_status !== 'cancelled'
   const cancelEligibility = detail
     ? evaluateOrderCancel({
         fulfillmentStatus: detail.order.fulfillment_status,
@@ -242,10 +243,35 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
                       label={t.orders.hub.identity.collectedAt}
                       value={formatDateTime(detail.order.collected_at)}
                     />
+                    {detail.order.fulfillment_status === 'cancelled' ? (
+                      <>
+                        <IdentityRow
+                          label={t.orders.hub.identity.cancelledBy}
+                          value={
+                            detail.order.cancelled_by_name ??
+                            t.orders.hub.identity.none
+                          }
+                        />
+                        <IdentityRow
+                          label={t.orders.hub.identity.cancelledAt}
+                          value={formatDateTime(detail.order.cancelled_at)}
+                        />
+                        <IdentityRow
+                          label={t.orders.hub.identity.cancelReason}
+                          value={
+                            detail.order.cancel_reason ??
+                            t.orders.hub.identity.none
+                          }
+                        />
+                      </>
+                    ) : null}
                   </div>
                 </div>
 
-                {hasApproved && isManager && detail.money ? (
+                {hasApproved &&
+                isManager &&
+                detail.money &&
+                detail.order.fulfillment_status !== 'cancelled' ? (
                   <FinancialAdjustPanel
                     orderId={detail.order.id}
                     money={detail.money}

@@ -256,15 +256,13 @@ export function PosPage() {
       'list',
       search,
       shiftId,
-      viewingCancelled ? 'cancelled' : 'active',
+      viewingCancelled ? 'cancelled-day' : 'active',
     ],
     queryFn: () =>
       fetchOrdersForPos({
         search: search || undefined,
-        shiftId: shiftId ?? undefined,
-        // With an open shift: show ALL shift orders (any cashier). hubOnly hides
-        // paid+completed tickets and looked like "orders disappeared" after user switch.
-        // Cancelled archive always lists cancelled only (not hub-action queue).
+        // Active hub: current shift. Cancelled archive: today's cancelled (manager review).
+        shiftId: viewingCancelled ? undefined : (shiftId ?? undefined),
         hubOnly: viewingCancelled ? false : !shiftId,
         fulfillmentStatus: viewingCancelled ? 'cancelled' : undefined,
       }),
@@ -273,10 +271,9 @@ export function PosPage() {
   })
 
   const cancelledCountQuery = useQuery({
-    queryKey: ['orders', 'cancelled-count', shiftId],
+    queryKey: ['orders', 'cancelled-count-day'],
     queryFn: () =>
       fetchOrdersForPos({
-        shiftId: shiftId ?? undefined,
         hubOnly: false,
         fulfillmentStatus: 'cancelled',
       }),
@@ -908,6 +905,27 @@ export function PosPage() {
                             </span>
                           ) : null}
                         </div>
+
+                        {o.fulfillment_status === 'cancelled' ? (
+                          <div className="mb-0.5 space-y-0.5 rounded-lg bg-[#fef2f2] px-1.5 py-1 text-[9px] leading-snug text-[#991b1b]">
+                            {o.cancel_reason ? (
+                              <p className="truncate">
+                                {t.orders.hub.cancelArchive.reason}:{' '}
+                                {o.cancel_reason}
+                              </p>
+                            ) : null}
+                            <p className="truncate">
+                              {t.orders.hub.cancelArchive.by}:{' '}
+                              {o.cancelled_by_name || t.orders.hub.identity.none}
+                            </p>
+                            {(o.reversed_collections_count ?? 0) > 0 ? (
+                              <p>
+                                {t.orders.hub.cancelArchive.reversals}:{' '}
+                                {o.reversed_collections_count}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
 
                         <div className="mb-0.5 flex items-center justify-between gap-1 text-[10px] text-[#64748b]">
                           <span>
