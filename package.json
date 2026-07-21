@@ -57,6 +57,7 @@
     "test:cancelled-shift-seq": "node scripts/test-cancelled-and-shift-order-seq.mjs",
     "test:reopen-cancelled": "node scripts/test-reopen-cancelled-block.mjs",
     "test:money-cycle": "node scripts/test-drawer-shift-e2e.mjs && node scripts/test-cancelled-and-shift-order-seq.mjs && node scripts/test-reopen-cancelled-block.mjs",
+    "test:full-break": "node scripts/test-full-break.mjs",
     "test:chaos": "node scripts/test-chaos-suite.mjs",
     "test:chaos-fuzz": "node scripts/test-chaos-fuzz.mjs",
     "test:pos-hold": "node --experimental-strip-types scripts/test-pos-hold.ts",

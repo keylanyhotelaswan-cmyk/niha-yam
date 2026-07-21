@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js'
 import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
 import { refuseProductionMutations } from './script-safety.mjs'
+import { testingStaffCredentials } from './testing-credentials.mjs'
 
 /**
  * M4 operational review — runs the 12 treasury scenarios end-to-end against the
@@ -8,11 +9,11 @@ import { refuseProductionMutations } from './script-safety.mjs'
  * resets the treasury ledger to a pristine state (service role) unless --no-cleanup.
  *
  * Usage:
- *   pnpm test:m4 -- --username abomalek --password "SECRET" [--no-cleanup]
+ *   pnpm test:m4
+ *   pnpm test:m4 -- --username manager --password "Testing123!" [--no-cleanup]
  */
 
 const SEED_RESTAURANT_ID = 'a0000000-0000-4000-8000-000000000001'
-const INTERNAL_EMAIL_DOMAIN = 'staff.niha.local'
 
 function readArg(name, fallback = null) {
   const idx = process.argv.indexOf(name)
@@ -57,18 +58,17 @@ async function main() {
   const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
   assertTestingTarget(url)
   refuseProductionMutations(url)
-  if (!anonKey) throw new Error('Missing VITE_SUPABASE_ANON_KEY in .env.local')
-  if (!serviceKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY in .env.local')
+  if (!anonKey) throw new Error('Missing VITE_SUPABASE_ANON_KEY in .env.testing')
+  if (!serviceKey) throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY in .env.testing')
 
-  const username = (readArg('--username', 'abomalek')).trim().toLowerCase()
-  const password = readArg('--password', '741523')
+  const { username, password, email } = testingStaffCredentials()
 
   const supabase = createClient(url, anonKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
 
   const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: `${username}@${INTERNAL_EMAIL_DOMAIN}`,
+    email,
     password,
   })
   if (signInError) {
@@ -112,6 +112,27 @@ async function main() {
   }
   if (!safe.is_active) {
     throw new Error('Cash safe is inactive after fixture bootstrap (NO_CASH_SAFE risk).')
+  }
+
+  // 0) Close leftover open shift (SHIFT_ALREADY_OPEN)
+  {
+    const { data: open0 } = await rpc('get_open_shift')
+    if (open0?.id) {
+      const physical = Number(open0.physical_drawer_balance ?? open0.expected_cash ?? 0)
+      const expected = Number(open0.expected_cash ?? physical)
+      const diff = Math.abs(physical - expected)
+      await expectOk(
+        '00 close leftover shift',
+        rpc('close_shift', {
+          p_actual_cash_count: physical,
+          p_difference_reason: diff > 0.009 ? 'm4 pre-clean' : null,
+          p_notes: 'm4 pre-clean',
+          p_destination: 'to_main',
+        }),
+      )
+    } else {
+      record('00 close leftover shift', true, 'none open')
+    }
   }
 
   // 1) Open shift with opening float 1000 -----------------------------------
@@ -178,17 +199,17 @@ async function main() {
   // 9) Close shift with NO difference ---------------------------------------
   let { data: report } = await rpc('get_open_shift')
   await expectError('09a close with diff but no reason',
-    rpc('close_shift', { p_actual_cash_count: report.expected_cash + 5, p_difference_reason: '', p_notes: null }),
+    rpc('close_shift', { p_actual_cash_count: report.expected_cash + 5, p_difference_reason: '', p_notes: null, p_destination: 'to_main' }),
     'DIFFERENCE_REASON_REQUIRED')
   await expectOk('09b close_shift(no difference)',
-    rpc('close_shift', { p_actual_cash_count: report.expected_cash, p_difference_reason: null, p_notes: 'إغلاق مطابق' }))
+    rpc('close_shift', { p_actual_cash_count: report.expected_cash, p_difference_reason: null, p_notes: 'إغلاق مطابق', p_destination: 'to_main' }))
   record('09c variance == 0', near(report.expected_cash - report.expected_cash, 0))
 
   // 10) Close shift with a SHORTAGE -----------------------------------------
   await rpc('open_shift', { p_opening_float: 500 })
   ;({ data: report } = await rpc('get_open_shift'))
   await expectOk('10 close_shift(shortage -50)',
-    rpc('close_shift', { p_actual_cash_count: report.expected_cash - 50, p_difference_reason: 'عجز اختبار', p_notes: null }))
+    rpc('close_shift', { p_actual_cash_count: report.expected_cash - 50, p_difference_reason: 'عجز اختبار', p_notes: null, p_destination: 'to_main' }))
   {
     const { data: led } = await rpc('get_treasury_ledger', { p_treasury_id: drawer.id, p_limit: 3 })
     const v = (led ?? []).find((e) => e.source === 'variance')
@@ -200,7 +221,7 @@ async function main() {
   await rpc('open_shift', { p_opening_float: 500 })
   ;({ data: report } = await rpc('get_open_shift'))
   await expectOk('11 close_shift(overage +30)',
-    rpc('close_shift', { p_actual_cash_count: report.expected_cash + 30, p_difference_reason: 'زيادة اختبار', p_notes: null }))
+    rpc('close_shift', { p_actual_cash_count: report.expected_cash + 30, p_difference_reason: 'زيادة اختبار', p_notes: null, p_destination: 'to_main' }))
   {
     const { data: led } = await rpc('get_treasury_ledger', { p_treasury_id: drawer.id, p_limit: 3 })
     const v = (led ?? []).find((e) => e.source === 'variance')
@@ -260,6 +281,9 @@ async function serviceCleanup(url, serviceKey, log) {
   await admin.from('treasury_transfers').delete().eq('restaurant_id', r)
   await admin.from('treasury_adjustments').delete().eq('restaurant_id', r)
   await admin.from('expenses').delete().eq('restaurant_id', r)
+  // Handovers / liquidity must not outlive wiped movements (orphan reserved).
+  await admin.from('shift_handovers').delete().eq('restaurant_id', r)
+  await admin.from('liquidity_allocations').delete().eq('restaurant_id', r)
   await admin.from('shifts').delete().eq('restaurant_id', r)
   await admin.from('financial_ref_counters').delete().eq('restaurant_id', r)
   if (log) return

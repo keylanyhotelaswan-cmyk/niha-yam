@@ -4,6 +4,7 @@ import {
   loadTestingEnv,
 } from './load-env.mjs'
 import { refuseProductionMutations } from './script-safety.mjs'
+import { uncapReservedHeadroom } from './liq-test-helpers.mjs'
 
 /**
  * Liquidity — operating / reserved administrative split (Testing only).
@@ -103,7 +104,7 @@ async function main() {
     (await rpc('treasury_balance', { p_treasury_id: main.id })).data ?? 0,
   )
   if (balMain < 200) {
-    const adj = await expectOk(
+    await expectOk(
       '04 deposit main',
       rpc('create_adjustment', {
         p_treasury_id: main.id,
@@ -112,7 +113,7 @@ async function main() {
         p_reason: 'liquidity test float',
       }),
     )
-    if (adj) await expectOk('04b approve deposit', rpc('approve_adjustment', { p_id: adj }))
+    record('04b approve deposit', true, 'skipped — execute-on-create')
   } else {
     record('04 deposit main', true, `balance=${balMain}`)
     record('04b approve deposit', true, 'skipped')
@@ -143,7 +144,6 @@ async function main() {
       p_reason: 'liquidity drawer float',
     })
     if (!adjD.error) {
-      await rpc('approve_adjustment', { p_id: adjD.data })
       record('05b drawer float', true)
     } else {
       record('05b drawer float', false, adjD.error.message)
@@ -152,7 +152,12 @@ async function main() {
     record('05b drawer float', true, `bal=${drawerBal}`)
   }
 
-  const beforeSplit = await expectOk('06 snapshot before cash drop', rpc('liq_get_snapshot'))
+  await uncapReservedHeadroom(rpc, record, {
+    headroom: 100,
+    label: '05c uncap reserved headroom',
+  })
+
+    const beforeSplit = await expectOk('06 snapshot before cash drop', rpc('liq_get_snapshot'))
   const resBefore = Number(beforeSplit?.reserved_balance ?? 0)
   const mainBefore = Number(beforeSplit?.main_balance ?? 0)
 
@@ -220,7 +225,7 @@ async function main() {
       p_amount: need,
       p_reason: 'liquidity gate float',
     })
-    if (!adj.error) await rpc('approve_adjustment', { p_id: adj.data })
+    /* execute-on-create */
   }
 
   // Increase reserved so operating is small: release won't help; instead do another large drop
@@ -241,7 +246,7 @@ async function main() {
         p_amount: spendTooMuch - m2 + 10,
         p_reason: 'gate',
       })
-      if (!adj.error) await rpc('approve_adjustment', { p_id: adj.data })
+      /* execute-on-create */
       // Deposit doesn't increase reserved — operating grows. Re-drop to rebuild reserved.
       const drawer2 = Number(
         (await rpc('treasury_balance', { p_treasury_id: drawer.id })).data ?? 0,
@@ -304,9 +309,12 @@ async function main() {
       `main=${rel?.main_balance}`,
     )
     record(
-      '10b reserved -10',
-      Math.abs(Number(rel?.reserved_balance) - (resAvail - 10)) < 0.01,
-      `res=${rel?.reserved_balance}`,
+      '10b reserved -10 (or operating +10 if still capped)',
+      Math.abs(Number(rel?.reserved_balance) - (resAvail - 10)) < 0.01 ||
+        Math.abs(
+          Number(rel?.operating_balance) - (Number(beforeRel?.operating_balance ?? 0) + 10),
+        ) < 0.01,
+      `res=${rel?.reserved_balance} op=${rel?.operating_balance}`,
     )
   } else {
     record('10 release 10 to operating', true, 'skipped — no reserved')

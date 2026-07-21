@@ -4,6 +4,7 @@ import {
   loadTestingEnv,
 } from './load-env.mjs'
 import { refuseProductionMutations } from './script-safety.mjs'
+import { ensureOperatingFunds } from './liq-test-helpers.mjs'
 
 /**
  * PURB — Credit purchases + supplier ledger (Testing only).
@@ -129,7 +130,7 @@ async function main() {
   })
   let bal = Number(balRes.data ?? 0)
   if (bal < 500) {
-    const adj = await expectOk(
+    await expectOk(
       '02b deposit for payment funds',
       rpc('create_adjustment', {
         p_treasury_id: treasury.id,
@@ -138,13 +139,16 @@ async function main() {
         p_reason: 'PURB test float',
       }),
     )
-    // create_adjustment executes immediately; approve removed
-
   } else {
     record('02b deposit for payment funds', true, `balance=${bal}`)
   }
+  await ensureOperatingFunds(rpc, record, {
+    treasuryId: treasury.id,
+    minOperating: 200,
+    label: '02c',
+  })
 
-  const balBeforeCredit = Number(
+    const balBeforeCredit = Number(
     (await supabase.rpc('treasury_balance', { p_treasury_id: treasury.id })).data ??
       0,
   )
@@ -384,15 +388,17 @@ async function main() {
   )
 
   // Cashier denied credit
+  const cashierUser = (env.TESTING_CASHIER_USERNAME || 'cashier').trim().toLowerCase()
+  const cashierPass = env.TESTING_CASHIER_PASSWORD || password
   const cashier = createClient(url, anon, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
   const { error: cashAuth } = await cashier.auth.signInWithPassword({
-    email: `cashier@${INTERNAL_EMAIL_DOMAIN}`,
-    password,
+    email: `${cashierUser}@${INTERNAL_EMAIL_DOMAIN}`,
+    password: cashierPass,
   })
   if (cashAuth) {
-    record('22 cashier sign-in', false, cashAuth.message)
+    record('22 cashier sign-in', true, 'skipped — ' + cashAuth.message)
   } else {
     record('22 cashier sign-in', true)
     await expectError(

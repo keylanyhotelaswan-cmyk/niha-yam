@@ -1,15 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 import { assertTestingTarget, loadTestingEnv } from './load-env.mjs'
 import { refuseProductionMutations } from './script-safety.mjs'
+import { testingStaffCredentials } from './testing-credentials.mjs'
 
 /**
  * INVA — Inventory movements, Stock Card, dashboard (qty only).
  *
  * Usage:
- *   pnpm test:inventory -- --username abomalek --password "SECRET"
+ *   pnpm test:inventory
  */
-
-const INTERNAL_EMAIL_DOMAIN = 'staff.niha.local'
 
 function readArg(name, fallback = null) {
   const idx = process.argv.indexOf(name)
@@ -59,13 +58,12 @@ async function main() {
     process.exit(1)
   }
 
-  const username = readArg('--username', 'abomalek').trim().toLowerCase()
-  const password = readArg('--password', '741523')
+  const { username, password, email } = testingStaffCredentials()
   const supabase = createClient(url, anon, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
   const { error: authErr } = await supabase.auth.signInWithPassword({
-    email: `${username}@${INTERNAL_EMAIL_DOMAIN}`,
+    email,
     password,
   })
   if (authErr) {
