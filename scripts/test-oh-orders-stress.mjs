@@ -350,9 +350,9 @@ async function main() {
   )
 
   if (!hasFlag('--no-cleanup')) {
-    // Close cleanly: approve pending then close
+    // Close cleanly: heal any residual pending then close
     if (shiftId) {
-      await rpc('approve_pending_for_shift', { p_shift_id: shiftId })
+      await rpc('heal_residual_pending_for_shift', { p_shift_id: shiftId })
       const { data: ctxClose } = await rpc('get_pos_context')
       const expected = Number(ctxClose?.open_shift?.expected_cash ?? 0)
       await rpc('close_shift', {

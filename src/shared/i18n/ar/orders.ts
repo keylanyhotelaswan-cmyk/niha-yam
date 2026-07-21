@@ -186,21 +186,12 @@ export const orders = {
     pendingExpensesTotal: 'إجمالي المصروفات المعلّقة',
     byCategory: 'حسب التصنيف',
     expenseReason: 'سبب المصروف',
-    approveAll: 'اعتماد الكل',
     rejectAll: 'رفض الكل',
     reviewExceptions: 'مراجعة الاستثناءات',
     backToSummary: 'العودة للملخص',
-    approveOne: 'اعتماد',
     rejectOne: 'رفض',
     rejectReason: 'سبب الرفض',
     rejectReasonRequired: 'سبب الرفض مطلوب.',
-    approvedAll: (collections: number, expenses: number) => {
-      const parts: string[] = []
-      if (collections > 0) parts.push(`${collections} تحصيل`)
-      if (expenses > 0) parts.push(`${expenses} مصروف`)
-      if (parts.length === 0) return 'لا توجد عناصر.'
-      return `تمت معالجة ${parts.join(' و ')}.`
-    },
     rejectedAll: (collections: number, expenses: number) => {
       const parts: string[] = []
       if (collections > 0) parts.push(`${collections} تحصيل`)
@@ -252,6 +243,8 @@ export const orders = {
       'لا يمكن إلغاء الطلب لأنه دخل التنفيذ/أُرسل للمطبخ.',
     CANCEL_BLOCKED_DELIVERED: 'لا يمكن إلغاء الطلب بعد التسليم.',
     ORDER_CANCELLED: 'لا يمكن تسجيل تحصيل على فاتورة ملغاة.',
+    APPROVE_REMOVED:
+      'مسار الاعتماد أُلغي. الحركات تُنفَّذ فورًا؛ استخدم الرفض للعكس.',
     REOPEN_REQUIRES_APPROVED_COLLECTION:
       'إعادة الفتح متاحة فقط بعد وجود تحصيل معتمد.',
     ALREADY_IN_REVIEW: 'الطلب بالفعل تحت المراجعة.',

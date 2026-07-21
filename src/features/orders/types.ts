@@ -204,8 +204,3 @@ export type PendingExpensesSummary = {
     amount: number
   }>
 }
-
-export type ApprovePendingResult = {
-  approved_count: number
-  approved_expenses_count: number
-}

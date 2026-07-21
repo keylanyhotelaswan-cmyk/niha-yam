@@ -95,14 +95,6 @@ export function useCreateTransfer() {
   })
 }
 
-export function useApproveTransfer() {
-  const invalidate = useInvalidateAll()
-  return useMutation({
-    mutationFn: (id: string) => api.approveTransfer(id),
-    onSuccess: invalidate,
-  })
-}
-
 export function useRejectTransfer() {
   const invalidate = useInvalidateAll()
   return useMutation({
@@ -127,14 +119,6 @@ export function useCreateExpense() {
   })
 }
 
-export function useApproveExpense() {
-  const invalidate = useInvalidateAll()
-  return useMutation({
-    mutationFn: (id: string) => api.approveExpense(id),
-    onSuccess: invalidate,
-  })
-}
-
 export function useRejectExpense() {
   const invalidate = useInvalidateAll()
   return useMutation({
@@ -155,14 +139,6 @@ export function useCreateAdjustment() {
   const invalidate = useInvalidateAll()
   return useMutation({
     mutationFn: (input: CreateAdjustmentInput) => api.createAdjustment(input),
-    onSuccess: invalidate,
-  })
-}
-
-export function useApproveAdjustment() {
-  const invalidate = useInvalidateAll()
-  return useMutation({
-    mutationFn: (id: string) => api.approveAdjustment(id),
     onSuccess: invalidate,
   })
 }

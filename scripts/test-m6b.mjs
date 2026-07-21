@@ -136,7 +136,7 @@ async function main() {
   {
     const { data: leftover } = await rpc('get_open_shift')
     if (leftover?.id) {
-      await rpc('approve_pending_for_shift', { p_shift_id: leftover.id })
+      await rpc('heal_residual_pending_for_shift', { p_shift_id: leftover.id })
       await rpc('close_shift', {
         p_actual_cash_count: Number(leftover.expected_cash ?? 0),
         p_difference_reason: null,

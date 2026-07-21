@@ -316,17 +316,8 @@ async function main() {
     .single()
   record('09a flag cleared', afterClear?.requires_review === false)
 
-  // Approve then block free edit
-  const shiftId = (await rpc('get_pos_context')).data?.open_shift?.id
-  if (shiftId) {
-    await expectOk(
-      '10 approve_pending_for_shift',
-      rpc('approve_pending_for_shift', { p_shift_id: shiftId }),
-    )
-  }
-
   await expectError(
-    '11 free edit blocked after approve',
+    '11 free edit blocked after money posted',
     rpc('edit_pending_order', {
       p_order_id: unpaid.order_id,
       p_items: editItems,

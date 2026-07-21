@@ -138,12 +138,10 @@ async function main() {
         p_reason: 'PURB test float',
       }),
     )
-    if (adj) {
-      await expectOk('02c approve deposit', rpc('approve_adjustment', { p_id: adj }))
-    }
+    // create_adjustment executes immediately; approve removed
+
   } else {
     record('02b deposit for payment funds', true, `balance=${bal}`)
-    record('02c approve deposit', true, 'skipped')
   }
 
   const balBeforeCredit = Number(

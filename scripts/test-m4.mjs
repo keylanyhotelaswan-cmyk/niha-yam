@@ -130,8 +130,8 @@ async function main() {
     p_source_treasury_id: safe.id, p_dest_treasury_id: digital.id, p_amount: 100, p_reason: 'اختبار',
   })
   record('03 create_transfer returns id', Boolean(trId), String(trId))
-  // Legacy approve is idempotent no-op when already executed
-  await expectOk('03b approve_transfer no-op', rpc('approve_transfer', { p_id: trId }))
+  // Legacy approve stubs raise APPROVE_REMOVED
+  await expectError('03b approve_transfer removed', rpc('approve_transfer', { p_id: trId }), 'APPROVE_REMOVED')
   b = await balances()
   record('03a safe==200 & digital==100', near(b.safe.balance, 200) && near(b.digital.balance, 100),
     `safe=${b.safe.balance} digital=${b.digital.balance}`)
@@ -142,7 +142,7 @@ async function main() {
     p_description: 'نثرية', p_vendor: null,
   })
   record('04 create_expense returns id', Boolean(expId), String(expId))
-  await expectOk('04b approve_expense no-op', rpc('approve_expense', { p_id: expId }))
+  await expectError('04b approve_expense removed', rpc('approve_expense', { p_id: expId }), 'APPROVE_REMOVED')
   b = await balances()
   record('04a drawer==650', near(b.drawer.balance, 650), `drawer=${b.drawer.balance}`)
 

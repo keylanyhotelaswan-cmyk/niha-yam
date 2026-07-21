@@ -6,7 +6,7 @@ import { refuseProductionMutations } from './script-safety.mjs'
  * E2E (Testing only): shift drawer ownership — expense + cash/instapay/ewallet
  * collections execute immediately; Reject reverses; close to_main succeeds.
  *
- * Credentials: NIHA_TEST_USER / NIHA_TEST_PASSWORD in .env.testing
+ * Credentials: NIHA_TEST_* or TESTING_MANAGER_* in .env.testing
  */
 
 const INTERNAL = 'staff.niha.local'
@@ -17,10 +17,19 @@ refuseProductionMutations(env.VITE_SUPABASE_URL, 'test-drawer-shift-e2e')
 const url = env.VITE_SUPABASE_URL
 const anon = env.VITE_SUPABASE_ANON_KEY
 const serviceKey = env.SUPABASE_SERVICE_ROLE_KEY
-const username = (process.env.NIHA_TEST_USER || env.NIHA_TEST_USER || 'manager')
+const username = (
+  process.env.NIHA_TEST_USER ||
+  env.NIHA_TEST_USER ||
+  env.TESTING_MANAGER_USERNAME ||
+  'manager'
+)
   .trim()
   .toLowerCase()
-const password = process.env.NIHA_TEST_PASSWORD || env.NIHA_TEST_PASSWORD || 'Testing123!'
+const password =
+  process.env.NIHA_TEST_PASSWORD ||
+  env.NIHA_TEST_PASSWORD ||
+  env.TESTING_MANAGER_PASSWORD ||
+  'Testing123!'
 
 const results = []
 function record(name, ok, detail = '') {

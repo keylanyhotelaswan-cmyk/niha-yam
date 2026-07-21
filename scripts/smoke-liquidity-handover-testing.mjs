@@ -84,7 +84,6 @@ async function main() {
       p_amount: 100,
       p_reason: 'smoke float',
     })
-    if (!adj.error) await rpc('approve_adjustment', { p_id: adj.data })
     drawerBal = Number((await rpc('treasury_balance', { p_treasury_id: drawer.id })).data ?? 0)
   }
 
@@ -158,7 +157,6 @@ async function main() {
       p_amount: tryAmt - mBal + 20,
       p_reason: 'smoke gate',
     })
-    if (!adj.error) await rpc('approve_adjustment', { p_id: adj.data })
   }
   // rebuild reserved if deposit inflated operating without reserved
   const snap2 = (await rpc('liq_get_snapshot')).data

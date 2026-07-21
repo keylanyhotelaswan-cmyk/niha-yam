@@ -222,26 +222,21 @@ async function main() {
     `op=${opDrawer}`,
   )
 
-  const shiftIdForApprove = ctxAfterSale?.open_shift?.id
-  if (shiftIdForApprove) {
-    await expectOk(
-      '02e approve_pending_for_shift',
-      rpc('approve_pending_for_shift', { p_shift_id: shiftIdForApprove }),
-    )
-    const bApproved = await rpc('get_treasury_balances')
-    const drawerApproved =
-      (bApproved.data ?? []).find((t) => t.id === drawer.id)?.balance ?? 0
-    const instaApproved =
-      (bApproved.data ?? []).find((t) => t.id === instapayTreasury.id)?.balance ?? 0
+  {
+    const bPosted = await rpc('get_treasury_balances')
+    const drawerPosted =
+      (bPosted.data ?? []).find((t) => t.id === drawer.id)?.balance ?? 0
+    const instaPosted =
+      (bPosted.data ?? []).find((t) => t.id === instapayTreasury.id)?.balance ?? 0
     record(
-      '02f drawer += net cash after approve',
-      near(drawerApproved - drawerBefore, netCash),
-      `delta=${drawerApproved - drawerBefore}`,
+      '02f drawer += net cash after sale',
+      near(drawerPosted - drawerBefore, netCash),
+      `delta=${drawerPosted - drawerBefore}`,
     )
     record(
-      '02g instapay += digital after approve',
-      near(instaApproved - instaBefore, instaPart),
-      `delta=${instaApproved - instaBefore}`,
+      '02g instapay += digital after sale',
+      near(instaPosted - instaBefore, instaPart),
+      `delta=${instaPosted - instaBefore}`,
     )
   }
 
@@ -294,15 +289,7 @@ async function main() {
       record('05a change = 10', near(openSale.change, 10), `change=${openSale.change}`)
       const b1 = await rpc('get_treasury_balances')
       const d1 = (b1.data ?? []).find((t) => t.id === drawer.id)?.balance ?? 0
-      record('05b ledger unchanged until approve', near(d1, d0), `delta=${d1 - d0}`)
-      const { data: ctxOpen } = await rpc('get_pos_context')
-      const sid = ctxOpen?.open_shift?.id
-      if (sid) {
-        await rpc('approve_pending_for_shift', { p_shift_id: sid })
-        const b2 = await rpc('get_treasury_balances')
-        const d2 = (b2.data ?? []).find((t) => t.id === drawer.id)?.balance ?? 0
-        record('05c ledger +190 after approve', near(d2 - d0, openPrice), `delta=${d2 - d0}`)
-      }
+      record('05b ledger +190 on finalize', near(d1 - d0, openPrice), `delta=${d1 - d0}`)
     }
   } else {
     record('05 open price sale', true, 'skipped — no open price item')
@@ -352,11 +339,6 @@ async function main() {
       p_client_request_id: null,
     }),
   )
-
-  const { data: ctxPreClose } = await rpc('get_pos_context')
-  if (ctxPreClose?.open_shift?.id) {
-    await rpc('approve_pending_for_shift', { p_shift_id: ctxPreClose.open_shift.id })
-  }
 
   const { data: openShift } = await rpc('get_open_shift')
   await expectOk(

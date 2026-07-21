@@ -46,7 +46,7 @@ export async function upsertCategory(
   input: UpsertCategoryInput,
 ): Promise<string> {
   const { data, error } = await supabase.rpc('upsert_menu_category', {
-    p_id: input.id,
+    p_id: input.id ?? '',
     p_name: input.name,
     p_sort_order: input.sortOrder,
     p_show_in_pos: input.showInPos,
@@ -70,10 +70,10 @@ export async function setCategoryStatus(
 // Items --------------------------------------------------------------------
 export async function upsertItem(input: UpsertItemInput): Promise<string> {
   const { data, error } = await supabase.rpc('upsert_menu_item', {
-    p_id: input.id,
-    p_category_id: input.categoryId,
+    p_id: input.id ?? '',
+    p_category_id: input.categoryId ?? '',
     p_name: input.name,
-    p_sku: input.sku,
+    p_sku: input.sku ?? '',
     p_base_price: input.basePrice,
     p_sort_order: input.sortOrder,
     p_show_in_pos: input.showInPos,
@@ -83,7 +83,7 @@ export async function upsertItem(input: UpsertItemInput): Promise<string> {
     p_allows_discounts: input.allowsDiscounts,
     p_is_open_price: input.isOpenPrice,
     p_is_favorite: input.isFavorite,
-    p_description: input.description,
+    p_description: input.description ?? '',
   })
   if (error) throw wrap(error)
   const itemId = data as string
@@ -129,7 +129,7 @@ export async function upsertModifierGroup(
   input: UpsertModifierGroupInput,
 ): Promise<string> {
   const { data, error } = await supabase.rpc('upsert_modifier_group', {
-    p_id: input.id,
+    p_id: input.id ?? '',
     p_name: input.name,
     p_min_selections: input.minSelections,
     p_max_selections: input.maxSelections,
@@ -156,7 +156,7 @@ export async function upsertModifierOption(
   input: UpsertModifierOptionInput,
 ): Promise<string> {
   const { data, error } = await supabase.rpc('upsert_modifier_option', {
-    p_id: input.id,
+    p_id: input.id ?? '',
     p_group_id: input.groupId,
     p_name: input.name,
     p_price_delta: input.priceDelta,

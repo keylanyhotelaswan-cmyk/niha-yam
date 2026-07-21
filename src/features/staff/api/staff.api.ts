@@ -74,9 +74,9 @@ export async function updateStaff(input: {
     p_display_name: input.displayName,
     p_branch_assignments: [{ branch_id: input.branchId, role: input.role }],
     p_discount_permissions: input.discountPermissions ?? null,
-    p_can_operational_purchase: input.canOperationalPurchase ?? null,
+    p_can_operational_purchase: input.canOperationalPurchase,
     p_set_operational_purchase: input.setOperationalPurchase ?? false,
-    p_can_print_manage: input.canPrintManage ?? null,
+    p_can_print_manage: input.canPrintManage,
     p_set_print_manage: input.setPrintManage ?? false,
   })
   if (error) throw new Error(rpcErrorMessage(error.message))

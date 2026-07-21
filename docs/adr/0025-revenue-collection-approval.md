@@ -2,6 +2,8 @@
 
 **Status:** **Superseded for operational money path (2026-07-19)** — collections execute on
 record; manager **Reject** = reverse with full audit. Pending→approve gate removed from product UX.
+**Amendment 2026-07-21:** `approve_*` RPCs raise `APPROVE_REMOVED`. Residual pending (if any)
+may be healed via `heal_residual_pending_for_shift` (ops/scripts only — not product Approve).
 Historical decision text below retained for archaeology.
 **Date:** 2026-07-08
 **Supersedes (partial):** M5A behaviour where `finalize_sale` posts ledger movements immediately on

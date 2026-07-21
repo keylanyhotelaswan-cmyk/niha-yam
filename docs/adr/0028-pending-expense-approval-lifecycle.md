@@ -2,6 +2,8 @@
 
 **Status:** **Superseded (2026-07-19)** — expenses (and all operational money ops) execute on
 create; Reject = reverse. Pending→approve gate removed.
+**Amendment 2026-07-21:** `approve_expense` / `approve_pending_for_shift` raise `APPROVE_REMOVED`.
+Residual pending (rare) → `heal_residual_pending_for_shift` (ops/scripts only).
 **Date:** 2026-07-09
 **Complements:** [ADR-0025](./0025-revenue-collection-approval.md),
 [ADR-0005](./0005-financial-approval-and-reversal-model.md),

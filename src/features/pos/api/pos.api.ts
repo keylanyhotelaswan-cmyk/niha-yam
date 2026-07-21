@@ -58,18 +58,18 @@ export async function finalizeSale(input: {
   const { data, error } = await supabase.rpc('finalize_sale', {
     p_items: input.items,
     p_tenders: input.tenders,
-    p_discount: input.discount ?? null,
-    p_order_note: input.orderNote ?? null,
-    p_client_request_id: input.clientRequestId ?? null,
+    p_discount: input.discount ?? undefined,
+    p_order_note: input.orderNote ?? undefined,
+    p_client_request_id: input.clientRequestId ?? undefined,
     p_order_type: input.orderType ?? 'takeaway',
-    p_customer_id: input.customerId ?? null,
-    p_customer_phone: input.customerPhone ?? null,
-    p_customer_name: input.customerName ?? null,
-    p_delivery_address: input.deliveryAddress ?? null,
-    p_delivery_zone: input.deliveryZone ?? null,
-    p_delivery_notes: input.deliveryNotes ?? null,
-    p_dine_in_table_ref: input.dineInTableRef ?? null,
-    p_delivery_driver_id: input.deliveryDriverId ?? null,
+    p_customer_id: input.customerId ?? undefined,
+    p_customer_phone: input.customerPhone ?? undefined,
+    p_customer_name: input.customerName ?? undefined,
+    p_delivery_address: input.deliveryAddress ?? undefined,
+    p_delivery_zone: input.deliveryZone ?? undefined,
+    p_delivery_notes: input.deliveryNotes ?? undefined,
+    p_dine_in_table_ref: input.dineInTableRef ?? undefined,
+    p_delivery_driver_id: input.deliveryDriverId ?? undefined,
   })
   if (error) throw wrap(error)
   return data as unknown as FinalizeSaleResult
@@ -171,7 +171,7 @@ export async function posOperationalTransfer(input: {
     p_source_treasury_id: input.sourceTreasuryId,
     p_dest_treasury_id: input.destTreasuryId,
     p_amount: input.amount,
-    p_reason: input.reason ?? null,
+    p_reason: input.reason ?? undefined,
   })
   if (error) throw wrap(error)
   return data as string
@@ -186,8 +186,8 @@ export async function posRecordExpense(input: {
   const { data, error } = await supabase.rpc('pos_record_expense', {
     p_amount: input.amount,
     p_category: input.category ?? 'petty_cash',
-    p_description: input.description ?? null,
-    p_vendor: input.vendor ?? null,
+    p_description: input.description ?? undefined,
+    p_vendor: input.vendor ?? undefined,
   })
   if (error) throw wrap(error)
   return data as string

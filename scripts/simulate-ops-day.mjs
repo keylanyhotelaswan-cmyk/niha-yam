@@ -184,7 +184,6 @@ async function main() {
       p_amount: 2000,
       p_reason: 'ops-day float main',
     })
-    if (adj.data) await rpc('approve_adjustment', { p_id: adj.data })
     record('Day open: main cash deposit', !adj.error, adj.error?.message ?? '')
   }
 
@@ -392,10 +391,7 @@ async function main() {
   const { data: ctxMid } = await rpc('get_pos_context')
   const shiftId = ctxMid?.open_shift?.id
   if (shiftId) {
-    await expectOk(
-      'Collection: approve_pending_for_shift',
-      rpc('approve_pending_for_shift', { p_shift_id: shiftId }),
-    )
+    record('Collection: create already posts; approve removed', true, 'skipped')
   }
 
   // -------------------------------------------------------------------------
@@ -454,7 +450,6 @@ async function main() {
   }
   record('Expenses: 5 POS expenses', expOk >= 4, `ok=${expOk}`)
   if (shiftId) {
-    await rpc('approve_pending_for_shift', { p_shift_id: shiftId })
   }
 
   // -------------------------------------------------------------------------
@@ -567,7 +562,6 @@ async function main() {
       p_amount: 500,
       p_reason: 'ops-day purchase float',
     })
-    if (adj.data) await rpc('approve_adjustment', { p_id: adj.data })
   }
 
   const purchaseIds = []
@@ -826,7 +820,7 @@ async function main() {
     record('Stress: expense→transfer→purchase', !chain.error, chain.error?.message ?? '')
   }
 
-  if (shiftId) await rpc('approve_pending_for_shift', { p_shift_id: shiftId })
+  if (shiftId) await rpc('heal_residual_pending_for_shift', { p_shift_id: shiftId })
 
   // -------------------------------------------------------------------------
   // Close shift

@@ -4,7 +4,6 @@ import { t } from '@/shared/i18n'
 import type { DiscountPayload } from '@/shared/access/discountPermissions'
 import type { Database } from '@/types/database.generated'
 import type {
-  ApprovePendingResult,
   OrderDetail,
   OrderListItem,
   PendingCollectionRow,
@@ -198,23 +197,6 @@ export async function appendOrderItems(
   }
 }
 
-export async function approvePendingForShift(
-  shiftId: string,
-): Promise<ApprovePendingResult> {
-  const { data, error } = await rpc('approve_pending_for_shift', {
-    p_shift_id: shiftId,
-  })
-  if (error) throw wrap(error)
-  const row = data as {
-    approved_count?: number
-    approved_expenses_count?: number
-  } | null
-  return {
-    approved_count: row?.approved_count ?? 0,
-    approved_expenses_count: row?.approved_expenses_count ?? 0,
-  }
-}
-
 export async function rejectPendingForShift(
   shiftId: string,
   reason: string,
@@ -232,11 +214,6 @@ export async function rejectPendingForShift(
     rejected_count: row?.rejected_count ?? 0,
     rejected_expenses_count: row?.rejected_expenses_count ?? 0,
   }
-}
-
-export async function approveCollection(id: string): Promise<void> {
-  const { error } = await rpc('approve_collection', { p_id: id })
-  if (error) throw wrap(error)
 }
 
 export async function rejectCollection(id: string, reason: string): Promise<void> {
@@ -265,11 +242,6 @@ export async function fetchPendingExpenses(
   })
   if (error) throw wrap(error)
   return (data as PendingExpenseRow[]) ?? []
-}
-
-export async function approveExpense(id: string): Promise<void> {
-  const { error } = await rpc('approve_expense', { p_id: id })
-  if (error) throw wrap(error)
 }
 
 export async function rejectExpense(id: string, reason: string): Promise<void> {

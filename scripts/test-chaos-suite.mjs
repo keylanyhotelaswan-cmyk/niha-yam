@@ -163,7 +163,7 @@ async function main() {
   console.log('--- Shift Chaos ---')
   const { data: ctxS } = await rpc('get_pos_context')
   const shiftId = ctxS?.open_shift?.id
-  if (shiftId) await rpc('approve_pending_for_shift', { p_shift_id: shiftId })
+  if (shiftId) await rpc('heal_residual_pending_for_shift', { p_shift_id: shiftId })
   const { data: ctxS2 } = await rpc('get_pos_context')
   const expected = Number(ctxS2?.open_shift?.expected_cash ?? 0)
 
@@ -203,7 +203,7 @@ async function main() {
   // Reject then receive
   await expectOk('Shift open for Path B setup', rpc('open_shift', { p_opening_float: 100 }))
   const { data: ctxB } = await rpc('get_pos_context')
-  await rpc('approve_pending_for_shift', { p_shift_id: ctxB.open_shift.id })
+  await rpc('heal_residual_pending_for_shift', { p_shift_id: ctxB.open_shift.id })
   const { data: ctxB2 } = await rpc('get_pos_context')
   const closeB = await expectOk(
     'Shift close to_next',
@@ -267,7 +267,7 @@ async function main() {
       p_tenders: [{ payment_method_id: cashPm.id, amount: unit }],
     })
   }
-  await rpc('approve_pending_for_shift', { p_shift_id: ctxT2.open_shift.id })
+  await rpc('heal_residual_pending_for_shift', { p_shift_id: ctxT2.open_shift.id })
 
   const drops = await Promise.all([
     rpc('cash_drop', { p_amount: 30, p_reason: 'chaos-a' }),
@@ -293,21 +293,22 @@ async function main() {
     exps.map((r) => r.error?.message ?? 'ok').join('|'),
   )
 
-  // Approve vs reject same expense
   const expId = exps.find((r) => !r.error)?.data
   if (expId) {
-    const ar = await Promise.all([
-      rpc('approve_expense', { p_id: expId }),
-      rpc('reject_expense', { p_id: expId, p_reason: 'chaos race' }),
-    ])
-    const arOk = ar.filter((r) => !r.error).length
+    const a = await rpc('approve_expense', { p_id: expId })
     record(
-      'Treasury approve∥reject expense → exactly one wins',
-      arOk === 1,
-      ar.map((r) => r.error?.message ?? 'ok').join('|'),
+      'Treasury approve_expense → APPROVE_REMOVED',
+      !!a.error && String(a.error.message).includes('APPROVE_REMOVED'),
+      a.error?.message ?? 'unexpected ok',
+    )
+    const r = await rpc('reject_expense', { p_id: expId, p_reason: 'chaos reverse' })
+    record(
+      'Treasury reject/reverse expense after execute',
+      !r.error || String(r.error.message).includes('INVALID_STATE'),
+      r.error?.message ?? 'ok',
     )
   } else {
-    record('Treasury approve∥reject expense', true, 'skipped-no-expense')
+    record('Treasury approve_expense removed', true, 'skipped-no-expense')
   }
 
   // =========================================================================

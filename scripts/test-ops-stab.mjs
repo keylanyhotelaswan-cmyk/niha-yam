@@ -117,16 +117,11 @@ async function main() {
 
     const tid = created.data
     if (tid) {
-      const [a, r] = await Promise.all([
-        rpc('approve_transfer', { p_id: tid }),
-        rpc('reject_transfer', { p_id: tid, p_reason: 'ops-stab race reject' }),
-      ])
-      const aOk = !a.error
-      const rOk = !r.error
+      const a = await rpc('approve_transfer', { p_id: tid })
       record(
-        'Concurrent approve∥reject: exactly one success',
-        (aOk ? 1 : 0) + (rOk ? 1 : 0) === 1,
-        `approve=${aOk} (${a.error?.message ?? 'ok'}) reject=${rOk} (${r.error?.message ?? 'ok'})`,
+        'approve_transfer → APPROVE_REMOVED',
+        !!a.error && String(a.error.message).includes('APPROVE_REMOVED'),
+        a.error?.message ?? 'unexpected ok',
       )
 
       const { data: row } = await supabase
@@ -136,8 +131,8 @@ async function main() {
         .maybeSingle()
       const status = row?.status
       record(
-        'Transfer final status executed|rejected',
-        status === 'executed' || status === 'rejected',
+        'Transfer executed on create',
+        status === 'executed',
         `status=${status}`,
       )
 

@@ -231,7 +231,7 @@ export async function cashDrop(
 ): Promise<void> {
   const { error } = await supabase.rpc('cash_drop', {
     p_amount: amount,
-    p_reason: reason,
+    p_reason: reason ?? '',
   })
   if (error) throw wrap(error)
 }
@@ -244,13 +244,8 @@ export async function createTransfer(
     p_source_treasury_id: input.sourceTreasuryId,
     p_dest_treasury_id: input.destTreasuryId,
     p_amount: input.amount,
-    p_reason: input.reason,
+    p_reason: input.reason ?? '',
   })
-  if (error) throw wrap(error)
-}
-
-export async function approveTransfer(id: string): Promise<void> {
-  const { error } = await supabase.rpc('approve_transfer', { p_id: id })
   if (error) throw wrap(error)
 }
 
@@ -282,14 +277,9 @@ export async function createExpense(input: CreateExpenseInput): Promise<void> {
     p_treasury_id: input.treasuryId,
     p_category: input.category,
     p_amount: input.amount,
-    p_description: input.description,
-    p_vendor: input.vendor,
+    p_description: input.description ?? '',
+    p_vendor: input.vendor ?? '',
   })
-  if (error) throw wrap(error)
-}
-
-export async function approveExpense(id: string): Promise<void> {
-  const { error } = await supabase.rpc('approve_expense', { p_id: id })
   if (error) throw wrap(error)
 }
 
@@ -320,13 +310,8 @@ export async function createAdjustment(
     p_treasury_id: input.treasuryId,
     p_kind: input.kind,
     p_amount: input.amount,
-    p_reason: input.reason,
+    p_reason: input.reason ?? '',
   })
-  if (error) throw wrap(error)
-}
-
-export async function approveAdjustment(id: string): Promise<void> {
-  const { error } = await supabase.rpc('approve_adjustment', { p_id: id })
   if (error) throw wrap(error)
 }
 
@@ -390,7 +375,7 @@ export async function setPaymentMethodMapping(
 ): Promise<void> {
   const { error } = await supabase.rpc('set_payment_method_mapping', {
     p_id: id,
-    p_treasury_id: treasuryId,
+    p_treasury_id: treasuryId ?? '',
   })
   if (error) throw wrap(error)
 }
