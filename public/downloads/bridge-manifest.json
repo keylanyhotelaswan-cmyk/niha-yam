@@ -1,13 +1,13 @@
 {
   "name": "NIHA Print Bridge",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "file": "niha-print-bridge-win-x64.zip",
   "url": "/downloads/niha-print-bridge-win-x64.zip",
   "setupFile": null,
   "setupUrl": null,
   "platform": "win-x64",
   "selfContained": true,
-  "publishedAt": "2026-07-19T14:40:16.145Z",
-  "sizeBytes": 67052111,
-  "notes": "ملكية الطابعة تتبع الجهاز الحالي عند النقل بين أجهزة (سيرفر + Pair)\nتحديث أوضح: انتظار إغلاق البرنامج + إعادة محاولة النسخ قبل إعادة التشغيل\nمنع تشغيل نسختين من البرنامج على نفس الجهاز\nتوضيح إضافة بيئة الاختبار بدون مسح الإنتاج"
+  "publishedAt": "2026-07-21T21:02:20.729Z",
+  "sizeBytes": 67053453,
+  "notes": "إعادة استخدام HttpClient المشترك بعد الخمول (SocketsHttpHandler) لتفادي انقطاع الاتصال الصامت\nحالة الربط: لا تُصفَّر بعد أول نجاح؛ Disconnected فقط بعد 5 إخفاقات متتالية\nتشخيص الاقتران: TargetUrl يعرض forceTarget أو أول اتصال أو الإعداد، مع عدد Connections\nرسائل أوضح لرابط السحابة الفارغ/غير الصالح (عربي/إنجليزي)"
 }
