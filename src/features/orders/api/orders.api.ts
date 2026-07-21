@@ -160,6 +160,44 @@ export async function clearOrderReview(orderId: string): Promise<void> {
   if (error) throw wrap(error)
 }
 
+export async function reopenOrder(
+  orderId: string,
+  reason: string,
+): Promise<{ order_id: string; requires_review: boolean; review_reason: string }> {
+  const { data, error } = await rpc('reopen_order', {
+    p_order_id: orderId,
+    p_reason: reason,
+  })
+  if (error) throw wrap(error)
+  return data as {
+    order_id: string
+    requires_review: boolean
+    review_reason: string
+  }
+}
+
+export async function appendOrderItems(
+  orderId: string,
+  items: SaleItemInput[],
+): Promise<{
+  order_id: string
+  financial_delta: number
+  money: unknown
+  requires_review: boolean
+}> {
+  const { data, error } = await rpc('append_order_items', {
+    p_order_id: orderId,
+    p_items: items,
+  })
+  if (error) throw wrap(error)
+  return data as {
+    order_id: string
+    financial_delta: number
+    money: unknown
+    requires_review: boolean
+  }
+}
+
 export async function approvePendingForShift(
   shiftId: string,
 ): Promise<ApprovePendingResult> {

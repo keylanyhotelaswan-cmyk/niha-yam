@@ -20,7 +20,7 @@ import { OrderMoneySummary } from '@/features/orders/components/OrderMoneySummar
 import { usePosCart } from '@/features/pos/hooks/usePosCart'
 import { sortPaymentMethods } from '@/features/pos/utils/paymentMethods'
 import { usePosContext, usePosMenu } from '@/features/pos/hooks/usePosQueries'
-import { editPendingOrder } from '@/features/orders/api/orders.api'
+import { editPendingOrder, appendOrderItems } from '@/features/orders/api/orders.api'
 import {
   fetchCustomerProfile,
   searchCustomers,
@@ -52,6 +52,8 @@ type Props = {
   onOpenChange: (open: boolean) => void
   detail: OrderDetail
   onSaved: () => void
+  /** append = add items only after reopen (keeps prior collections). */
+  mode?: 'edit' | 'append'
 }
 
 type TenderRow = { methodId: string; amount: string }
@@ -121,7 +123,14 @@ async function loadModifierIds(
   return map
 }
 
-export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) {
+export function OrderEditDialog({
+  open,
+  onOpenChange,
+  detail,
+  onSaved,
+  mode = 'edit',
+}: Props) {
+  const isAppend = mode === 'append'
   const queryClient = useQueryClient()
   const { staff } = useSession()
   const roles = staff?.branches.map((b) => b.role) ?? []
@@ -161,8 +170,9 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
     contextQuery.data?.discount_permissions ?? null,
   )
   const canEdit =
-    detail.order.can_free_edit !== false &&
-    !detail.money?.has_approved_collection
+    isAppend ||
+    (detail.order.can_free_edit !== false &&
+      !detail.money?.has_approved_collection)
 
   // Live preview: if replacing tenders, collected becomes new tender sum; else keep locked collected
   const lockedCollected = detail.money?.collected_amount ?? 0
@@ -181,6 +191,19 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
     let cancelled = false
 
     void (async () => {
+      if (isAppend) {
+        if (cancelled) return
+        cart.replaceLines([])
+        setCustomerName(detail.order.delivery_name ?? '')
+        setCustomerPhone(detail.order.delivery_phone ?? '')
+        setCustomerId(detail.order.customer_id ?? null)
+        setOrderNote(detail.order.order_note ?? '')
+        setReplaceTender(false)
+        setDiscountEnabled(false)
+        setHydrated(true)
+        return
+      }
+
       const modMap = await loadModifierIds(detail.items.map((i) => i.id))
       if (cancelled) return
 
@@ -246,7 +269,7 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- hydrate once per open+menu
-  }, [open, menu, detail.order.id])
+  }, [open, menu, detail.order.id, isAppend])
 
   useEffect(() => {
     if (!open) setHydrated(false)
@@ -349,7 +372,7 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
     }
 
     let tenders: TenderInput[] | null = null
-    if (replaceTender) {
+    if (!isAppend && replaceTender) {
       tenders = tenderRows
         .map((r) => ({
           payment_method_id: r.methodId,
@@ -362,7 +385,7 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
       }
     }
 
-    if (discountEnabled) {
+    if (!isAppend && discountEnabled) {
       const value = Number(discountValue) || 0
       const permErr = validateDiscountInput(discountPermissions, discountType, value)
       if (permErr) {
@@ -377,31 +400,38 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
 
     setSaving(true)
     try {
-      await editPendingOrder({
-        orderId: detail.order.id,
-        items: cart.lines.map((line) => ({
-          menu_item_id: line.menuItemId,
-          quantity: line.quantity,
-          modifier_option_ids: line.modifierOptionIds,
-          open_price: line.openPrice,
-          note: line.note,
-        })),
-        customerName: customerName || null,
-        customerPhone: customerPhone || null,
-        orderNote: orderNote.trim(),
-        tenders,
-        discount:
-          discountEnabled && liveDiscountAmount > 0
-            ? {
-                type: discountType,
-                value: Number(discountValue),
-                reason: discountReason.trim(),
-              }
-            : !discountEnabled && Number(detail.order.discount_amount ?? 0) > 0.001
-              ? null
-              : undefined,
-      })
-      toast.success(t.orders.hub.editSaved)
+      const items = cart.lines.map((line) => ({
+        menu_item_id: line.menuItemId,
+        quantity: line.quantity,
+        modifier_option_ids: line.modifierOptionIds,
+        open_price: line.openPrice,
+        note: line.note,
+      }))
+
+      if (isAppend) {
+        await appendOrderItems(detail.order.id, items)
+        toast.success(t.orders.reopen.appendDone)
+      } else {
+        await editPendingOrder({
+          orderId: detail.order.id,
+          items,
+          customerName: customerName || null,
+          customerPhone: customerPhone || null,
+          orderNote: orderNote.trim(),
+          tenders,
+          discount:
+            discountEnabled && liveDiscountAmount > 0
+              ? {
+                  type: discountType,
+                  value: Number(discountValue),
+                  reason: discountReason.trim(),
+                }
+              : !discountEnabled && Number(detail.order.discount_amount ?? 0) > 0.001
+                ? null
+                : undefined,
+        })
+        toast.success(t.orders.hub.editSaved)
+      }
       void queryClient.invalidateQueries({ queryKey: ['orders'] })
       onSaved()
       onOpenChange(false)
@@ -417,7 +447,7 @@ export function OrderEditDialog({ open, onOpenChange, detail, onSaved }: Props) 
       <DialogContent className="!flex max-h-[92dvh] max-w-5xl flex-col gap-0 overflow-hidden rounded-3xl border-0 p-0 shadow-[0_20px_50px_rgba(15,23,42,0.18)]">
         <DialogHeader className="shrink-0 border-b border-[#eef2f7] px-4 py-3">
           <DialogTitle className="flex flex-wrap items-center gap-2">
-            {t.orders.hub.editOrder}
+            {isAppend ? t.orders.reopen.appendTitle : t.orders.hub.editOrder}
             <span className="text-muted-foreground font-normal" dir="ltr">
               {detail.order.reference}
             </span>

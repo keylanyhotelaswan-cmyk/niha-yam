@@ -28,6 +28,9 @@ export type OrderListItem = {
   collected_amount?: number
   remaining_amount?: number
   requires_review?: boolean
+  review_reason?: string | null
+  review_flagged_at?: string | null
+  review_flagged_by_name?: string | null
   has_approved_collection?: boolean
   created_at: string
   created_by: string | null
@@ -117,6 +120,8 @@ export type OrderDetail = {
     shift_id?: string | null
     requires_review?: boolean
     review_reason?: string | null
+    review_flagged_at?: string | null
+    review_flagged_by_name?: string | null
     can_free_edit?: boolean
     cancel_reason?: string | null
     cancelled_at?: string | null
@@ -145,6 +150,8 @@ export type ReviewQueueItem = {
   review_reason: string | null
   requires_review: boolean
   money: OrderMoney
+  flagged_at?: string | null
+  flagged_by_name?: string | null
   last_edit_at: string | null
   financial_delta: number | null
   created_at: string

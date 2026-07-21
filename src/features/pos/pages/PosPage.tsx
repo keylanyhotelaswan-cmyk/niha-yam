@@ -105,13 +105,15 @@ function cardChrome(order: OrderListItem) {
       border: 'border-[#94a3b8]',
       header: 'bg-[#f1f5f9] text-[#475569]',
       label: t.orders.hub.filters.cancelled,
+      body: 'bg-white',
     }
   }
   if (order.requires_review) {
     return {
-      border: 'border-[#f97316]',
-      header: 'bg-[#fff7ed] text-[#c2410c]',
-      label: t.pos.hub.cardStatus.review,
+      border: 'border-[#dc2626] border-2',
+      header: 'bg-[#dc2626] text-white',
+      label: t.orders.review.badge,
+      body: 'bg-[#fef2f2]',
     }
   }
   if (order.payment_status === 'paid') {
@@ -119,6 +121,7 @@ function cardChrome(order: OrderListItem) {
       border: 'border-[#22c55e]',
       header: 'bg-[#dcfce7] text-[#15803d]',
       label: t.pos.hub.cardStatus.paid,
+      body: 'bg-white',
     }
   }
   if (order.payment_status === 'partial') {
@@ -126,12 +129,14 @@ function cardChrome(order: OrderListItem) {
       border: 'border-[#3b82f6]',
       header: 'bg-[#eff6ff] text-[#2563eb]',
       label: t.pos.hub.cardStatus.partial,
+      body: 'bg-white',
     }
   }
   return {
     border: 'border-[#eab308]',
     header: 'bg-[#fef9c3] text-[#a16207]',
     label: t.pos.hub.cardStatus.unpaid,
+    body: 'bg-white',
   }
 }
 
@@ -846,8 +851,9 @@ export function PosPage() {
                     <div
                       key={o.id}
                       className={cn(
-                        'overflow-hidden rounded-xl border bg-white shadow-[0_1px_8px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.08)]',
+                        'overflow-hidden rounded-xl border shadow-[0_1px_8px_rgba(15,23,42,0.04)] transition-all hover:-translate-y-0.5 hover:shadow-[0_6px_16px_rgba(15,23,42,0.08)]',
                         chrome.border,
+                        chrome.body,
                       )}
                     >
                       <div
@@ -906,6 +912,31 @@ export function PosPage() {
                           ) : null}
                         </div>
 
+                        {o.requires_review ? (
+                          <div className="mb-0.5 space-y-0.5 rounded-lg border border-[#fecaca] bg-[#fee2e2] px-1.5 py-1 text-[9px] leading-snug text-[#7f1d1d]">
+                            <p className="text-[11px] font-bold">
+                              {t.orders.review.badge}
+                            </p>
+                            {o.review_reason ? (
+                              <p className="truncate">
+                                {t.orders.review.reason}: {o.review_reason}
+                              </p>
+                            ) : null}
+                            <p className="truncate">
+                              {t.orders.review.by}:{' '}
+                              {o.review_flagged_by_name ||
+                                o.created_by_name ||
+                                t.orders.hub.identity.none}
+                            </p>
+                            <p>
+                              {t.orders.review.at}:{' '}
+                              {new Date(
+                                o.review_flagged_at || o.created_at,
+                              ).toLocaleString('ar-EG')}
+                            </p>
+                          </div>
+                        ) : null}
+
                         {o.fulfillment_status === 'cancelled' ? (
                           <div className="mb-0.5 space-y-0.5 rounded-lg bg-[#fef2f2] px-1.5 py-1 text-[9px] leading-snug text-[#991b1b]">
                             {o.cancel_reason ? (
@@ -918,6 +949,12 @@ export function PosPage() {
                               {t.orders.hub.cancelArchive.by}:{' '}
                               {o.cancelled_by_name || t.orders.hub.identity.none}
                             </p>
+                            {o.cancelled_at ? (
+                              <p>
+                                {t.orders.hub.cancelArchive.at}:{' '}
+                                {new Date(o.cancelled_at).toLocaleString('ar-EG')}
+                              </p>
+                            ) : null}
                             {(o.reversed_collections_count ?? 0) > 0 ? (
                               <p>
                                 {t.orders.hub.cancelArchive.reversals}:{' '}

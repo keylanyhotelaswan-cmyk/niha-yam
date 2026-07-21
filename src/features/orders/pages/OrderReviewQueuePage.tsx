@@ -8,7 +8,7 @@ import {
   fetchReviewQueue,
 } from '@/features/orders/api/orders.api'
 import { OrderMoneySummary } from '@/features/orders/components/OrderMoneySummary'
-import { formatMoney } from '@/features/treasury/utils/format'
+import { formatDateTime, formatMoney } from '@/features/treasury/utils/format'
 import { t } from '@/shared/i18n'
 
 export function OrderReviewQueuePage() {
@@ -31,7 +31,7 @@ export function OrderReviewQueuePage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-semibold">{t.orders.review.title}</h1>
+      <h1 className="text-xl font-bold text-[#991b1b]">{t.orders.review.title}</h1>
 
       {queueQuery.isLoading ? (
         <p className="text-muted-foreground text-sm">{t.common.loading}</p>
@@ -68,61 +68,53 @@ function ReviewCard({
   })
 
   return (
-    <div className="space-y-3 rounded-lg border p-4">
+    <div className="space-y-3 rounded-2xl border-2 border-[#dc2626] bg-[#fef2f2] p-4 shadow-[0_8px_24px_rgba(220,38,38,0.12)]">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <p className="font-semibold" dir="ltr">
+          <p className="text-lg font-bold text-[#7f1d1d]" dir="ltr">
             {row.reference}
           </p>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-sm text-[#991b1b]">
             {t.orders.review.cashier}: {row.cashier_name ?? '—'}
           </p>
         </div>
-        <Badge variant="secondary">{t.orders.review.title}</Badge>
+        <Badge className="border-[#fecaca] bg-[#dc2626] px-3 py-1.5 text-sm font-bold text-white">
+          {t.orders.review.badge}
+        </Badge>
       </div>
 
-      <p className="text-sm">
-        <span className="text-muted-foreground">{t.orders.review.reason}: </span>
-        {row.review_reason ?? '—'}
-      </p>
+      <div className="rounded-xl border border-[#fecaca] bg-white/80 p-3 text-sm text-[#7f1d1d]">
+        <p>
+          <span className="font-semibold">{t.orders.review.reason}: </span>
+          {row.review_reason ?? '—'}
+        </p>
+        <p className="mt-1">
+          <span className="font-semibold">{t.orders.review.by}: </span>
+          {row.flagged_by_name ?? row.cashier_name ?? '—'}
+        </p>
+        <p className="mt-1">
+          <span className="font-semibold">{t.orders.review.at}: </span>
+          {formatDateTime(row.flagged_at ?? row.last_edit_at ?? row.created_at)}
+        </p>
+      </div>
+
       {row.financial_delta != null ? (
-        <p className="text-sm">
-          <span className="text-muted-foreground">
-            {t.orders.review.financialDelta}:{' '}
-          </span>
-          {formatMoney(row.financial_delta)}
-        </p>
-      ) : null}
-      {row.last_edit_at ? (
-        <p className="text-muted-foreground text-xs">
-          {t.orders.review.lastEdit}:{' '}
-          {new Date(row.last_edit_at).toLocaleString('ar-EG')}
+        <p className="text-sm font-semibold text-[#991b1b]">
+          {t.orders.review.financialDelta}: {formatMoney(row.financial_delta)}
         </p>
       ) : null}
 
-      <OrderMoneySummary money={row.money} />
-
-      {detailQuery.data?.timeline?.length ? (
-        <div className="border-t pt-2">
-          <p className="mb-2 text-sm font-medium">{t.orders.hub.timeline}</p>
-          <ol className="max-h-40 space-y-1 overflow-y-auto text-sm">
-            {detailQuery.data.timeline.map((ev) => (
-              <li key={ev.id} className="border-s-2 ps-2">
-                <span className="font-medium">
-                  {ev.label ??
-                    (t.orders.timeline as Record<string, string>)[ev.event_type] ??
-                    ev.event_type}
-                </span>
-                <span className="text-muted-foreground ms-2 text-xs">
-                  {new Date(ev.created_at).toLocaleString('ar-EG')}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </div>
+      {detailQuery.data?.money ? (
+        <OrderMoneySummary money={detailQuery.data.money} />
       ) : null}
 
-      <Button type="button" size="sm" disabled={clearing} onClick={onClear}>
+      <Button
+        type="button"
+        variant="outline"
+        className="border-[#dc2626] text-[#991b1b]"
+        disabled={clearing}
+        onClick={onClear}
+      >
         {t.orders.review.clear}
       </Button>
     </div>

@@ -15,6 +15,7 @@ import {
   assignDeliveryDriver,
   collectRemaining,
   fetchOrderDetail,
+  reopenOrder,
   updateFulfillmentStatus,
 } from '@/features/orders/api/orders.api'
 import { CustomerProfileDrawer } from '@/features/customers/components/CustomerProfileDrawer'
@@ -38,6 +39,7 @@ import { posKeys } from '@/features/pos/hooks/pos.keys'
 import { useSession } from '@/shared/session/SessionProvider'
 import { cn } from '@/shared/utils/cn'
 import { t } from '@/shared/i18n'
+import { Label } from '@/shared/components/ui/label'
 
 import type { Database } from '@/types/database.generated'
 
@@ -71,6 +73,9 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
   const [driversOpen, setDriversOpen] = useState(false)
   const [reprintOpen, setReprintOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
+  const [reopenOpen, setReopenOpen] = useState(false)
+  const [reopenReason, setReopenReason] = useState('')
+  const [appendOpen, setAppendOpen] = useState(false)
 
   const detailQuery = useQuery({
     queryKey: ['orders', 'detail', orderId],
@@ -80,12 +85,25 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
 
   const detail = detailQuery.data
   const remaining = detail?.money?.remaining_amount ?? 0
+  const isCancelled = detail?.order.fulfillment_status === 'cancelled'
   const canEdit = detail
     ? detail.order.can_free_edit !== false &&
-      !detail.money?.has_approved_collection
+      !detail.money?.has_approved_collection &&
+      !isCancelled
     : false
-  const canCollect =
-    remaining > 0.001 && detail?.order.fulfillment_status !== 'cancelled'
+  const canCollect = remaining > 0.001 && !isCancelled
+  const canReopen = Boolean(
+    detail &&
+      !isCancelled &&
+      detail.money?.has_approved_collection &&
+      !detail.order.requires_review,
+  )
+  const canAppend = Boolean(
+    detail &&
+      !isCancelled &&
+      detail.order.requires_review &&
+      detail.money?.has_approved_collection,
+  )
   const cancelEligibility = detail
     ? evaluateOrderCancel({
         fulfillmentStatus: detail.order.fulfillment_status,
@@ -142,6 +160,18 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
     onError: (e: Error) => toast.error(e.message),
   })
 
+  const reopenMut = useMutation({
+    mutationFn: () => reopenOrder(orderId!, reopenReason.trim()),
+    onSuccess: () => {
+      toast.success(t.orders.reopen.done)
+      setReopenOpen(false)
+      setReopenReason('')
+      void queryClient.invalidateQueries({ queryKey: ['orders'] })
+      void detailQuery.refetch()
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
   return (
     <>
       <Dialog
@@ -181,8 +211,8 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
                     {t.orders.status.fulfillment[detail.order.fulfillment_status]}
                   </Badge>
                   {detail.order.requires_review ? (
-                    <Badge className="border-[#fde68a] bg-[#fef3c7] text-[#b45309]">
-                      {t.orders.review.title}
+                    <Badge className="border-[#fecaca] bg-[#dc2626] px-3 py-1 text-sm font-bold text-white">
+                      {t.orders.review.badge}
                     </Badge>
                   ) : null}
                   {canEdit ? (
@@ -203,6 +233,33 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
                   discountType={detail.order.discount_type}
                   discountValue={detail.order.discount_value}
                 />
+
+                {detail.order.requires_review ? (
+                  <div className="rounded-2xl border-2 border-[#dc2626] bg-[#fef2f2] p-4 text-sm text-[#7f1d1d]">
+                    <p className="mb-2 text-lg font-bold">
+                      {t.orders.review.badge}
+                    </p>
+                    <p>
+                      <span className="font-semibold">{t.orders.review.reason}: </span>
+                      {detail.order.review_reason ?? '—'}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">{t.orders.review.by}: </span>
+                      {detail.order.review_flagged_by_name ??
+                        detail.order.last_edited_by_name ??
+                        detail.order.created_by_name ??
+                        '—'}
+                    </p>
+                    <p className="mt-1">
+                      <span className="font-semibold">{t.orders.review.at}: </span>
+                      {formatDateTime(
+                        detail.order.review_flagged_at ??
+                          detail.order.last_edited_at ??
+                          detail.order.created_at,
+                      )}
+                    </p>
+                  </div>
+                ) : null}
 
                 <div className="rounded-2xl border border-white bg-white p-4 text-xs shadow-[0_2px_12px_rgba(15,23,42,0.05)]">
                   <p className="mb-2 text-sm font-bold">
@@ -584,7 +641,7 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
           </div>
 
           {detail ? (
-            <div className="grid gap-2 border-t border-[#eef2f7] bg-white p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid gap-2 border-t border-[#eef2f7] bg-white p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               <button
                 type="button"
                 disabled={!canEdit}
@@ -597,6 +654,24 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
                 <Pencil className="size-5" />
                 {t.orders.hub.editOrder}
               </button>
+              {canReopen ? (
+                <button
+                  type="button"
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[#7c3aed] text-sm font-semibold text-white"
+                  onClick={() => setReopenOpen(true)}
+                >
+                  {t.orders.reopen.action}
+                </button>
+              ) : null}
+              {canAppend ? (
+                <button
+                  type="button"
+                  className="inline-flex min-h-14 items-center justify-center gap-2 rounded-2xl bg-[#db2777] text-sm font-semibold text-white"
+                  onClick={() => setAppendOpen(true)}
+                >
+                  {t.orders.reopen.append}
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={!canCollect}
@@ -669,16 +744,51 @@ export function OrderDetailDialog({ orderId, onClose, onNavigateOrder }: Props) 
       />
 
       {detail ? (
-        <OrderEditDialog
-          open={editOpen}
-          onOpenChange={setEditOpen}
-          detail={detail}
-          onSaved={() => {
-            void detailQuery.refetch()
-            void queryClient.invalidateQueries({ queryKey: ['orders'] })
-          }}
-        />
+        <>
+          <OrderEditDialog
+            open={editOpen}
+            onOpenChange={setEditOpen}
+            detail={detail}
+            onSaved={() => {
+              void detailQuery.refetch()
+              void queryClient.invalidateQueries({ queryKey: ['orders'] })
+            }}
+          />
+          <OrderEditDialog
+            open={appendOpen}
+            onOpenChange={setAppendOpen}
+            detail={detail}
+            mode="append"
+            onSaved={() => {
+              void detailQuery.refetch()
+              void queryClient.invalidateQueries({ queryKey: ['orders'] })
+            }}
+          />
+        </>
       ) : null}
+
+      <Dialog open={reopenOpen} onOpenChange={setReopenOpen}>
+        <DialogContent className="max-w-sm rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>{t.orders.reopen.title}</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-[#64748b]">{t.orders.reopen.hint}</p>
+          <Label htmlFor="reopen-reason">{t.orders.reopen.reason}</Label>
+          <Input
+            id="reopen-reason"
+            value={reopenReason}
+            onChange={(e) => setReopenReason(e.target.value)}
+            placeholder={t.orders.reopen.reasonPlaceholder}
+          />
+          <Button
+            type="button"
+            disabled={!reopenReason.trim() || reopenMut.isPending}
+            onClick={() => reopenMut.mutate()}
+          >
+            {t.orders.reopen.confirm}
+          </Button>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={collectOpen} onOpenChange={setCollectOpen}>
         <DialogContent className="max-w-sm rounded-3xl">
