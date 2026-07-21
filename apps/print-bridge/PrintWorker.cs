@@ -237,6 +237,7 @@ public sealed class PrintWorker
 
     private readonly Dictionary<string, ConnectionPollDiag> _connDiags = new(StringComparer.OrdinalIgnoreCase);
     private bool _linkEverConnected;
+    private int _consecutiveLinkFailures;
 
     public event Action<BridgeLinkState>? StateChanged;
     public event Action? ActivityChanged;
@@ -436,6 +437,7 @@ public sealed class PrintWorker
 
                 if (anyConnected)
                 {
+                    _consecutiveLinkFailures = 0;
                     _linkEverConnected = true;
                     SetState(BridgeLinkState.Connected);
                     if (!anyJobsThisPoll)
@@ -443,9 +445,12 @@ public sealed class PrintWorker
                 }
                 else
                 {
-                    _linkEverConnected = false;
+                    // Do not clear _linkEverConnected once true (except paired.Count==0 above).
+                    // Avoid forcing Connecting every poll; only mark Disconnected after sustained failures.
+                    _consecutiveLinkFailures++;
                     SetActivity(BridgeActivity.Idle);
-                    SetState(BridgeLinkState.Disconnected);
+                    if (_consecutiveLinkFailures >= 5)
+                        SetState(BridgeLinkState.Disconnected);
                 }
             }
             catch (OperationCanceledException) { break; }

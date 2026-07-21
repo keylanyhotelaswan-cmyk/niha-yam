@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
@@ -9,9 +10,12 @@ namespace Niha.PrintBridge;
 /// Thin Supabase RPC client for Bridge only (BP-10: no business logic).
 /// Auth: anon key + bridge token — never service_role.
 /// One instance per cloud connection (Production or Testing).
+/// HttpClients are shared/cached per base URL + anon key (idle reconnect safe).
 /// </summary>
-public sealed class SupabaseBridgeApi
+public sealed class SupabaseBridgeApi : IDisposable
 {
+    private static readonly ConcurrentDictionary<string, HttpClient> SharedClients = new(StringComparer.OrdinalIgnoreCase);
+
     private readonly HttpClient _http;
     private readonly BridgeConnection _conn;
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -23,11 +27,52 @@ public sealed class SupabaseBridgeApi
 
     public SupabaseBridgeApi(BridgeConnection conn)
     {
-        _conn = conn;
-        _http = new HttpClient { BaseAddress = new Uri(conn.SupabaseUrl.TrimEnd('/') + "/") };
-        _http.DefaultRequestHeaders.Add("apikey", conn.AnonKey);
-        _http.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", conn.AnonKey);
+        _conn = conn ?? throw new ArgumentNullException(nameof(conn));
+        var baseUrl = NormalizeBaseUrl(conn.SupabaseUrl);
+        var cacheKey = baseUrl + "\n" + (conn.AnonKey ?? "");
+        _http = SharedClients.GetOrAdd(cacheKey, _ => CreateSharedClient(baseUrl, conn.AnonKey ?? ""));
+    }
+
+    private static HttpClient CreateSharedClient(string baseUrl, string anonKey)
+    {
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+            PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+        };
+        var http = new HttpClient(handler) { BaseAddress = new Uri(baseUrl) };
+        http.DefaultRequestHeaders.Add("apikey", anonKey);
+        http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", anonKey);
+        return http;
+    }
+
+    /// <summary>
+    /// Normalize Supabase project URL for HttpClient BaseAddress.
+    /// Throws a clear bilingual message instead of raw UriFormatException.
+    /// </summary>
+    public static string NormalizeBaseUrl(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+            throw new InvalidOperationException(
+                "Supabase URL is empty / رابط السحابة فارغ. تحقق من رمز الربط أو إعدادات الاتصال.");
+
+        var trimmed = url.Trim().TrimEnd('/') + "/";
+        if (!Uri.TryCreate(trimmed, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttps && uri.Scheme != Uri.UriSchemeHttp) ||
+            string.IsNullOrWhiteSpace(uri.Host))
+        {
+            throw new InvalidOperationException(
+                $"Invalid Supabase URL (host unparseable) / رابط السحابة غير صالح: {url}");
+        }
+
+        return trimmed;
+    }
+
+    /// <summary>Shared clients are process-lifetime — Dispose is intentionally a no-op.</summary>
+    public void Dispose()
+    {
+        // Shared HttpClient cache — do not dispose.
     }
 
     public async Task<JsonElement> PairAsync(

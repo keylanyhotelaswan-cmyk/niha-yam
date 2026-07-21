@@ -258,7 +258,8 @@ public sealed class PairForm : Form
             $"UserMessage: {userMessage}\n" +
             $"Detail: {technicalDetail ?? userMessage}\n" +
             $"TargetEnv: {(_forceTarget is null ? "(new)" : _forceTarget.Env)}\n" +
-            $"TargetUrl: {(_forceTarget?.SupabaseUrl ?? "(none)")}\n";
+            $"TargetUrl: {(_forceTarget?.SupabaseUrl ?? _cfg.PrimaryConnection()?.SupabaseUrl ?? _cfg.SupabaseUrl ?? "(none)")}\n" +
+            $"Connections: {_cfg.Connections?.Count ?? 0}\n";
         _log?.Error($"pair FAIL: {technicalDetail ?? userMessage}");
     }
 
