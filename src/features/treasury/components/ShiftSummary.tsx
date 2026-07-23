@@ -1,6 +1,9 @@
+import { useQuery } from '@tanstack/react-query'
 import { methodLabel } from '@/features/orders/components/PaymentBreakdownBadges'
+import { fetchShiftExpenses } from '@/features/treasury/api/treasury.api'
+import { treasuryKeys } from '@/features/treasury/hooks/treasury.keys'
 import { formatMoney } from '@/features/treasury/utils/format'
-import type { ShiftReport } from '@/features/treasury/types'
+import type { ExpenseRow, ShiftReport } from '@/features/treasury/types'
 import { t } from '@/shared/i18n'
 
 type Row = { label: string; value: number; tone?: 'in' | 'out' }
@@ -33,6 +36,16 @@ type Props = {
   showApprovalMetrics?: boolean
 }
 
+function categoryLabel(code: string): string {
+  const map = t.treasury.expenseCategory as Record<string, string>
+  return map[code] ?? code
+}
+
+function statusLabel(status: string): string {
+  const map = t.treasury.status as Record<string, string>
+  return map[status] ?? status
+}
+
 /**
  * Ledger-derived shift breakdown (admin approval metrics optional).
  * Cashier mode (showApprovalMetrics=false): cash sales + expected use the same
@@ -45,6 +58,12 @@ export function ShiftSummary({
   trustCashTotal,
   showApprovalMetrics = false,
 }: Props) {
+  const expensesQuery = useQuery({
+    queryKey: [...treasuryKeys.all, 'shift-summary-expenses', report.id],
+    queryFn: () => fetchShiftExpenses(report.id),
+    enabled: Boolean(report.id),
+  })
+
   // Prefer order-derived totals (pending + approved). Fall back to shift pending-only.
   const methods = (
     paymentMethodTotals ??
@@ -109,6 +128,8 @@ export function ShiftSummary({
     collectionStatusTotals != null &&
     (status.paid > 0.001 || status.unpaid > 0.001 || status.partial > 0.001)
 
+  const expenseRows = expensesQuery.data ?? []
+
   return (
     <div className="space-y-4 text-sm">
       <div className="space-y-1">
@@ -156,8 +177,7 @@ export function ShiftSummary({
             </span>
           </div>
         ) : null}
-        {showApprovalMetrics &&
-        pendingExpenses > 0.001 ? (
+        {showApprovalMetrics && pendingExpenses > 0.001 ? (
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">
               {t.treasury.shift.pendingExpenses}
@@ -182,6 +202,11 @@ export function ShiftSummary({
           </div>
         ) : null}
       </div>
+
+      <ExpenseDetailsList
+        loading={expensesQuery.isLoading}
+        rows={expenseRows}
+      />
 
       {hasStatus ? (
         <div className="space-y-2 border-t pt-3">
@@ -226,6 +251,79 @@ export function ShiftSummary({
           ))}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function ExpenseDetailsList({
+  loading,
+  rows,
+}: {
+  loading: boolean
+  rows: ExpenseRow[]
+}) {
+  return (
+    <div className="space-y-2 border-t pt-3">
+      <p className="text-muted-foreground text-xs font-semibold">
+        {t.treasury.shift.expensesDetailHeading}
+      </p>
+      {loading ? (
+        <p className="text-muted-foreground text-xs">{t.common.loading}</p>
+      ) : rows.length === 0 ? (
+        <p className="text-muted-foreground text-xs">
+          {t.treasury.shift.expensesDetailEmpty}
+        </p>
+      ) : (
+        <ul className="max-h-56 space-y-2 overflow-y-auto">
+          {rows.map((e) => {
+            const muted =
+              e.status === 'reversed' || e.status === 'rejected'
+            return (
+              <li
+                key={e.id}
+                className={`rounded-xl border px-3 py-2 ${
+                  muted
+                    ? 'border-[#e2e8f0] bg-[#f8fafc] opacity-80'
+                    : 'border-[#fecaca] bg-[#fef2f2]'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 text-start">
+                    <p className="font-semibold text-[#0f172a]">
+                      {categoryLabel(e.category)}
+                      {e.vendor ? (
+                        <span className="text-muted-foreground font-normal">
+                          {' '}
+                          · {e.vendor}
+                        </span>
+                      ) : null}
+                    </p>
+                    {e.description ? (
+                      <p className="text-muted-foreground mt-0.5 text-xs leading-snug">
+                        {e.description}
+                      </p>
+                    ) : null}
+                    <p className="text-muted-foreground mt-1 text-[10px]">
+                      {statusLabel(e.status)}
+                      {e.reference
+                        ? ` · ${t.treasury.shift.expenseRef} ${e.reference}`
+                        : ''}
+                    </p>
+                  </div>
+                  <span
+                    className={`shrink-0 font-bold ${
+                      muted ? 'text-[#64748b] line-through' : 'text-destructive'
+                    }`}
+                    dir="ltr"
+                  >
+                    {formatMoney(-Number(e.amount))}
+                  </span>
+                </div>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }

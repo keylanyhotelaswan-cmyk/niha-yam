@@ -108,6 +108,18 @@ export async function fetchExpenses(): Promise<ExpenseRow[]> {
   return data ?? []
 }
 
+/** Expenses belonging to one shift — for ملخص الوردية detail. */
+export async function fetchShiftExpenses(shiftId: string): Promise<ExpenseRow[]> {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('*')
+    .eq('shift_id', shiftId)
+    .order('created_at', { ascending: false })
+    .limit(100)
+  if (error) throw error
+  return data ?? []
+}
+
 export async function fetchAdjustments(): Promise<AdjustmentRow[]> {
   const { data, error } = await supabase
     .from('treasury_adjustments')
